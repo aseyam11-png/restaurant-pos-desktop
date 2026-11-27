@@ -1,0 +1,42 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+.local/
+
+# Java / Maven / Gradle
+**/target/
+**/build/
+.gradle/
+
+# Node
+node_modules/
+dist/
+.tauri/
+coverage/
+playwright-report/
+test-results/
+
+# Rust
+**/target/
+
+# Local data and backups
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+backups/
+customer-data/
