@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171b22">
+  <title>Restaurant POS — Prototype</title>
+  <style>
+    :root{font-family:Tahoma,Arial,sans-serif;color:#202630;background:#f4f5f7;font-synthesis:none}
+    *{box-sizing:border-box}body{margin:0;min-width:320px}button,input,select{font:inherit}
+    button{cursor:pointer}.shell{min-height:100vh;display:grid;grid-template-columns:224px minmax(0,1fr)}
+    .sidebar{background:#191e26;color:#e9edf2;padding:22px 14px;display:flex;flex-direction:column;gap:22px}
+    .brand{display:flex;align-items:center;gap:10px;padding:4px 7px 18px;border-bottom:1px solid #343b46}
+    .brand-mark{width:40px;height:40px;border-radius:12px;background:#e87536;color:white;display:grid;place-items:center;font-weight:800;font-size:19px}
+    .brand strong{display:block;font-size:14px}.brand small{color:#9aa4b2;font-size:10px}
+    .nav{display:grid;gap:6px}.nav button{border:0;background:transparent;color:#abb4c1;text-align:right;padding:12px;border-radius:9px;font-size:12px}
+    .nav button.active,.nav button:hover{background:#2a313c;color:white}.nav button.active{box-shadow:inset -3px 0 #e87536}
+    .offline{margin-top:auto;background:#222a34;border:1px solid #38414e;border-radius:10px;padding:12px;font-size:11px;color:#e4e8ed}
+    .offline small{display:block;color:#9da8b5;margin-top:5px}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#38b878;margin-left:7px}
+    main{min-width:0}.topbar{height:62px;background:#fff;border-bottom:1px solid #e6e8ec;display:flex;align-items:center;justify-content:space-between;padding:0 26px}
+    .topbar span{font-size:11px;color:#737d8b}.badge{background:#edf8f1;color:#258653;padding:6px 9px;border-radius:20px;font-size:10px}
+    .content{padding:24px;max-width:1600px;margin:auto}.heading{display:flex;justify-content:space-between;align-items:end;margin-bottom:18px;gap:12px}
+    .heading h1{font-size:23px;margin:0 0 7px}.heading p{font-size:11px;color:#838c98;margin:0}
+    .layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+    .card{background:#fff;border:1px solid #e7e9ee;border-radius:13px;box-shadow:0 4px 16px #202a3908}
+    .catalog{padding:17px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+    .toolbar h2,.order h2{font-size:14px;margin:0}.muted{font-size:10px;color:#8993a0}
+    .search{height:38px;max-width:300px;width:100%;border:1px solid #e1e5eb;border-radius:8px;padding:0 11px;outline:none}
+    .search:focus,input:focus,select:focus{border-color:#e87536;box-shadow:0 0 0 3px #e8753614;outline:0}
+    .categories{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0 16px}
+    .chip{border:1px solid #e2e6eb;border-radius:20px;background:#fff;color:#6f7986;padding:7px 12px;font-size:10px}
+    .chip.active{background:#fff0e7;color:#a84f20;border-color:#f4c5a8;font-weight:700}
+    .products{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+    .product{border:1px solid #e8ebef;border-radius:10px;padding:13px;text-align:right;background:#fff;min-height:112px;display:flex;flex-direction:column;justify-content:space-between;gap:14px}
+    .product:hover{border-color:#e9a47d;box-shadow:0 4px 12px #e8753614}.product strong{font-size:12px}.product small{color:#929ba7;font-size:10px}
+    .product-foot{display:flex;justify-content:space-between;align-items:center}.price{font-weight:800;color:#23865a;font-size:12px}.ask{color:#a65b2a;background:#fff2e9;padding:5px 7px;border-radius:6px;font-size:9px}
+    .order{padding:17px;position:sticky;top:12px}.order-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+    .field{display:grid;gap:6px;margin:11px 0}.field label{font-size:10px;color:#505a67;font-weight:700}
+    .field input,.field select{height:37px;border:1px solid #e1e5eb;border-radius:8px;padding:0 10px;width:100%;background:white;font-size:11px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.types{display:flex;gap:6px}
+    .types button{flex:1;border:1px solid #e0e4e9;background:#fff;border-radius:7px;padding:9px 4px;font-size:10px;color:#737d89}
+    .types button.active{background:#fff0e7;color:#a84f20;border-color:#f2c2a2;font-weight:700}
+    .cart{border-top:1px solid #eceef1;border-bottom:1px solid #eceef1;margin:14px 0;padding:5px 0;max-height:255px;overflow:auto}
+    .empty{padding:27px 5px;text-align:center;color:#99a1ac;font-size:11px}
+    .cart-line{padding:9px 2px;border-bottom:1px dashed #e9ebef;display:grid;grid-template-columns:1fr auto;gap:8px}
+    .cart-line:last-child{border:0}.cart-name{font-size:11px;font-weight:700}.cart-sub{color:#8b94a0;font-size:9px;margin-top:4px}
+    .controls{display:flex;align-items:center;gap:6px;margin-top:7px}.controls button{width:23px;height:23px;border:1px solid #e0e4e8;background:#fff;border-radius:6px}
+    .line-total{font-size:11px;font-weight:700;white-space:nowrap}
+    .summary{border-top:1px solid #eceef1;padding-top:12px;margin-top:11px}.sumrow{display:flex;justify-content:space-between;font-size:11px;color:#6e7885;margin-bottom:10px}
+    .sumrow.total{font-size:14px;color:#232a34;font-weight:800}.sumrow.total strong{font-size:20px;color:#248456}
+    .primary,.secondary,.danger{border:0;border-radius:8px;padding:11px 14px;font-size:11px;font-weight:700}
+    .primary{background:#e87536;color:#fff;width:100%}.primary:disabled{background:#c5cad1;cursor:not-allowed}
+    .secondary{background:#eef1f4;color:#4f5967}.danger{background:#fff0f0;color:#b33e3e}
+    .wallet-note{font-size:9px;color:#97653f;line-height:1.6}
+    .page{display:none}.page.active{display:block}
+    .panel{padding:18px}.panel h2{font-size:14px;margin:0 0 14px}
+    .table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{padding:11px 9px;border-bottom:1px solid #edf0f3;text-align:right;font-size:10px}
+    th{background:#f8f9fb;color:#7e8793;font-weight:700}td{color:#3c4652}
+    .status{border-radius:20px;padding:5px 8px;font-size:9px}.status.delivered{background:#eaf7ef;color:#258653}
+    .status.cancelled{background:#ffeded;color:#b13a3a}.status.new{background:#edf3ff;color:#3d66a6}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px}
+    .stat{padding:15px;border:1px solid #e8ebef;border-radius:10px;background:#fff}.stat span{display:block;font-size:10px;color:#828c98}.stat strong{font-size:18px;display:block;margin-top:8px}
+    .formgrid{display:grid;grid-template-columns:minmax(250px,.7fr) minmax(0,1.3fr);gap:15px}
+    .formgrid form{display:grid;gap:10px}.formgrid label{display:grid;gap:6px;font-size:10px;color:#57616d}
+    .formgrid input,.formgrid select{height:36px;border:1px solid #e1e5eb;border-radius:8px;padding:0 9px}
+    .price-modes{display:flex;gap:12px;font-size:10px}.hidden{display:none!important}
+    .notice{font-size:10px;color:#8a674c;background:#fff8ef;border-radius:8px;padding:10px;line-height:1.7;margin-top:12px}
+    .actions{display:flex;gap:6px}.actions button{padding:6px 8px;font-size:9px;border-radius:6px;border:1px solid #e1e5eb;background:white}
+    #print-root{display:none}
+    @media(max-width:1050px){.layout{grid-template-columns:minmax(0,1fr) 330px}.content{padding:18px}}
+    @media(max-width:800px){.shell{grid-template-columns:68px minmax(0,1fr)}.sidebar{padding:14px 7px}.brand{padding:0 0 15px}.brand>div:last-child,.nav-label,.nav button span:last-child,.offline small,.offline-text{display:none}.nav button{text-align:center;font-size:0;padding:12px 4px}.nav button b{font-size:16px}.offline{text-align:center;padding:9px 2px}.layout,.formgrid{grid-template-columns:1fr}.order{position:static;grid-row:1}.stats{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:560px){.content{padding:12px}.topbar{padding:0 12px}.heading h1{font-size:19px}.toolbar{align-items:stretch;flex-direction:column}.search{max-width:none}.products{grid-template-columns:repeat(2,minmax(0,1fr))}.stats{gap:7px}.stat{padding:11px}.row{grid-template-columns:1fr}}
+    @media print{
+      body{background:#fff}.shell,.print-hide{display:none!important}#print-root{display:block!important;width:72mm;margin:0 auto;padding:2mm;color:#000;font:11px Tahoma,Arial,sans-serif;direction:rtl}
+      #print-root h1{font-size:15px;text-align:center;margin:0 0 4px}#print-root .center{text-align:center}#print-root .rule{border-top:1px dashed #333;margin:6px 0}
+      #print-root .meta{font-size:10px;line-height:1.9}#print-root table{width:100%;white-space:normal}#print-root th,#print-root td{font-size:10px;padding:4px 2px;color:#000;background:#fff}
+      #print-root .total{font-size:14px;font-weight:800;display:flex;justify-content:space-between;margin-top:7px}
+      @page{size:80mm auto;margin:2mm}
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">R</div><div><strong>Restaurant POS</strong><small>نظام الكاشير</small></div></div>
+    <div class="nav-label muted">القائمة الرئيسية</div>
+    <nav class="nav" aria-label="القائمة الرئيسية">
+      <button class="active" data-page="cashier"><b>▣</b> <span>الكاشير</span></button>
+      <button data-page="products"><b>▤</b> <span>الأقسام والمنتجات</span></button>
+      <button data-page="orders"><b>☷</b> <span>الطلبات</span></button>
+      <button data-page="reports"><b>▥</b> <span>تقارير المبيعات</span></button>
+    </nav>
+    <div class="offline"><span class="dot"></span><span class="offline-text">يعمل محلياً</span><small>Prototype · بيانات مؤقتة</small></div>
+  </aside>
+  <main>
+    <header class="topbar"><span id="crumb">الكاشير</span><span class="badge">نموذج تجريبي — ليس للبيع الفعلي</span></header>
+    <section id="page-cashier" class="page active content">
+      <div class="heading"><div><h1>الكاشير</h1><p>اختر المنتجات، أدخل بيانات الزبون، ثم اعتمد الطلب واطبع الفاتورة.</p></div><span class="muted" id="today"></span></div>
+      <div class="layout">
+        <section class="card catalog">
+          <div class="toolbar"><div><h2>قائمة المنتجات</h2><span class="muted" id="product-count">0 منتج</span></div><input id="search" class="search" type="search" placeholder="ابحث عن اسم المنتج أو رقمه"></div>
+          <div class="categories" id="categories"></div>
+          <div class="products" id="products"></div>
+        </section>
+        <aside class="card order">
+          <div class="order-head"><h2>الطلب الحالي</h2><span class="muted">عملية بيع جديدة</span></div>
+          <div class="field"><label for="customer">اسم الزبون *</label><input id="customer" maxlength="80" placeholder="اسم الزبون"></div>
+          <div class="field"><label>نوع الطلب</label><div class="types" id="types"><button class="active" data-type="سفري">سفري</button><button data-type="داخل المطعم">داخل المطعم</button><button data-type="ديلفري">ديلفري</button></div></div>
+          <div class="cart" id="cart"><div class="empty">الطلب فارغ — اختر منتجاً لإضافته.</div></div>
+          <div class="field"><label>طريقة الدفع</label><select id="payment"><option>نقداً</option><option>محفظة إلكترونية</option><option>بطاقة</option></select></div>
+          <div class="field hidden" id="wallet-wrap"><label for="wallet-sender">رقم الجوال الذي حوّل منه (داخلي)</label><input id="wallet-sender" type="tel" inputmode="tel" maxlength="20" placeholder="رقم المحوّل منه"><small class="wallet-note">يحفظ في التقرير الداخلي فقط، ولا يظهر في فاتورة الزبون.</small></div>
+          <div class="summary"><div class="sumrow"><span>عدد الوحدات</span><strong id="units">0</strong></div><div class="sumrow total"><span>الإجمالي</span><strong id="total">0.00 ₪</strong></div><button id="confirm" class="primary" disabled>اعتماد الطلب وطباعة الفاتورة · F5</button></div>
+        </aside>
+      </div>
+    </section>
+    <section id="page-products" class="page content">
+      <div class="heading"><div><h1>الأقسام والمنتجات</h1><p>أنشئ المنتجات ليتم عرضها تلقائياً في الكاشير.</p></div></div>
+      <div class="formgrid">
+        <section class="card panel"><h2>إضافة منتج</h2>
+          <form id="product-form">
+            <label>اسم المنتج<input id="new-name" required maxlength="70" placeholder="مثال: فراشيح فلافل"></label>
+            <label>القسم<select id="new-category"></select></label>
+            <label>طريقة التسعير<div class="price-modes"><label><input type="radio" name="mode" value="fixed" checked> سعر محدد</label><label><input type="radio" name="mode" value="ask"> سعر غير محدد</label></div></label>
+            <label id="price-wrap">سعر البيع (شيكل)<input id="new-price" type="number" min="0.01" step="0.01" value="5"></label>
+            <button class="primary" type="submit">حفظ المنتج</button>
+          </form>
+          <div class="notice">رقم المنتج يُنشأ تلقائياً. السعر غير المحدد يُطلب من الكاشير عند إضافة المنتج إلى الطلب.</div>
+        </section>
+        <section class="card panel"><h2>المنتجات المسجلة</h2><div class="table-wrap"><table><thead><tr><th>رقم المنتج</th><th>المنتج</th><th>القسم</th><th>طريقة السعر</th><th>السعر</th></tr></thead><tbody id="product-rows"></tbody></table></div></section>
+      </div>
+    </section>
+    <section id="page-orders" class="page content">
+      <div class="heading"><div><h1>سجل الطلبات</h1><p>الطلبات المعتمدة لا تحذف؛ الإلغاء يظل مسجلاً مع حالته.</p></div></div>
+      <section class="card panel"><div class="table-wrap"><table><thead><tr><th>رقم الطلب</th><th>التاريخ والوقت</th><th>الزبون</th><th>نوع الطلب</th><th>الإجمالي</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody id="order-rows"><tr><td colspan="7">لا توجد طلبات.</td></tr></tbody></table></div></section>
+    </section>
+    <section id="page-reports" class="page content">
+      <div class="heading"><div><h1>تقارير المبيعات الداخلية</h1><p>رقم المحوّل منه يظهر هنا فقط عند الدفع بالمحفظة.</p></div><button id="csv" class="secondary">تصدير CSV</button></div>
+      <div class="stats"><div class="stat"><span>عدد الطلبات</span><strong id="r-orders">0</strong></div><div class="stat"><span>المبيعات المسجلة</span><strong id="r-sales">0.00 ₪</strong></div><div class="stat"><span>طلبات مسلّمة</span><strong id="r-delivered">0</strong></div><div class="stat"><span>طلبات ملغاة</span><strong id="r-cancelled">0</strong></div></div>
+      <section class="card panel"><h2>كشف المبيعات</h2><div class="table-wrap"><table><thead><tr><th>رقم الطلب</th><th>الزبون</th><th>النوع</th><th>الدفع</th><th>رقم المحوّل منه (داخلي)</th><th>المبلغ</th><th>الحالة</th></tr></thead><tbody id="report-rows"><tr><td colspan="7">لا توجد بيانات.</td></tr></tbody></table></div></section>
+    </section>
+  </main>
+</div>
+<div id="print-root"></div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const money = n => new Intl.NumberFormat('ar', {minimumFractionDigits:2,maximumFractionDigits:2}).format(n) + ' ₪';
+  const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const categories = ['الكل','الفلافل','السندويشات','المشروبات'];
+  let selectedCategory = 'الكل';
+  let orderType = 'سفري';
+  let cart = [];
+  let orders = [];
+  let nextOrder = 125;
+  let nextProduct = 1004;
+  let products = [
+    {id:1001,name:'فلافل',category:'الفلافل',mode:'fixed',price:5},
+    {id:1002,name:'فراشيح فلافل',category:'الفلافل',mode:'ask',price:null},
+    {id:1003,name:'حمص',category:'الفلافل',mode:'fixed',price:6}
+  ];
+
+  $('today').textContent = new Intl.DateTimeFormat('ar',{dateStyle:'full'}).format(new Date());
+
+  function setPage(page) {
+    document.querySelectorAll('.page').forEach(el => el.classList.toggle('active',el.id === 'page-'+page));
+    document.querySelectorAll('.nav button').forEach(el => el.classList.toggle('active',el.dataset.page === page));
+    $('crumb').textContent = ({cashier:'الكاشير',products:'الأقسام والمنتجات',orders:'سجل الطلبات',reports:'تقارير المبيعات'})[page];
+    if(page==='orders') renderOrders();
+    if(page==='reports') renderReports();
+    if(page==='products') renderProductTable();
+  }
+  document.querySelectorAll('.nav button').forEach(btn => btn.addEventListener('click',()=>setPage(btn.dataset.page)));
+
+  function renderCategories() {
+    $('categories').innerHTML = categories.map(c => '<button class="chip '+(c===selectedCategory?'active':'')+'" data-category="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>').join('');
+    $('categories').querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{selectedCategory=btn.dataset.category;renderCategories();renderProducts();}));
+    $('new-category').innerHTML = categories.filter(c=>c!=='الكل').map(c=>'<option>'+escapeHtml(c)+'</option>').join('');
+  }
+  function renderProducts() {
+    const q = $('search').value.trim().toLocaleLowerCase();
+    const visible = products.filter(p=>(selectedCategory==='الكل'||p.category===selectedCategory) && (p.name.toLocaleLowerCase().includes(q)||String(p.id).includes(q)));
+    $('product-count').textContent = visible.length+' منتج';
+    $('products').innerHTML = visible.map(p => '<button class="product" data-id="'+p.id+'"><strong>'+escapeHtml(p.name)+'</strong><div class="product-foot"><span class="price">'+(p.mode==='ask'?'أدخل السعر':money(p.price))+'</span><small>'+escapeHtml(p.category)+'</small></div></button>').join('');
+    $('products').querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>addProduct(Number(btn.dataset.id))));
+  }
+  $('search').addEventListener('input',renderProducts);
+
+  function addProduct(id) {
+    const p = products.find(x=>x.id===id); if(!p) return;
+    let unitPrice = p.price;
+    if(p.mode==='ask') {
+      const entered = window.prompt('أدخل سعر '+p.name+' للطلب الحالي (شيكل):');
+      if(entered===null) return;
+      unitPrice = Number(entered);
+      if(!Number.isFinite(unitPrice)||unitPrice<=0) {window.alert('أدخل سعراً صحيحاً أكبر من صفر.');return;}
+    }
+    const line = cart.find(x=>x.productId===p.id && x.unitPrice===unitPrice);
+    if(line) line.quantity++;
+    else cart.push({productId:p.id,name:p.name,unit:p.unit,unitPrice,quantity:1});
+    renderCart();
+  }
+  function renderCart() {
+    $('cart').innerHTML = cart.length ? cart.map((x,i)=>'<div class="cart-line"><div><div class="cart-name">'+escapeHtml(x.name)+'</div><div class="cart-sub">'+money(x.unitPrice)+' للوحدة</div><div class="controls"><button data-action="minus" data-index="'+i+'" aria-label="تقليل">−</button><b>'+x.quantity+'</b><button data-action="plus" data-index="'+i+'" aria-label="زيادة">+</button><button data-action="remove" data-index="'+i+'" aria-label="حذف السطر">×</button></div></div><div class="line-total">'+money(x.unitPrice*x.quantity)+'</div></div>').join('') : '<div class="empty">الطلب فارغ — اختر منتجاً لإضافته.</div>';
+    $('cart').querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{
+      const i=Number(btn.dataset.index), action=btn.dataset.action;
+      if(action==='minus') cart[i].quantity--;
+      if(action==='plus') cart[i].quantity++;
+      if(action==='remove'||cart[i].quantity<=0) cart.splice(i,1);
+      renderCart();
+    }));
+    const units=cart.reduce((n,x)=>n+x.quantity,0), total=cart.reduce((n,x)=>n+x.quantity*x.unitPrice,0);
+    $('units').textContent=String(units); $('total').textContent=money(total);
+    $('confirm').disabled=!cart.length;
+  }
+  document.querySelectorAll('#types button').forEach(btn=>btn.addEventListener('click',()=>{orderType=btn.dataset.type;document.querySelectorAll('#types button').forEach(b=>b.classList.toggle('active',b===btn));}));
+  $('payment').addEventListener('change',()=>{$('wallet-wrap').classList.toggle('hidden',$('payment').value!=='محفظة إلكترونية');});
+  document.querySelectorAll('input[name="mode"]').forEach(el=>el.addEventListener('change',()=>{$('price-wrap').classList.toggle('hidden',document.querySelector('input[name="mode"]:checked').value==='ask');}));
+  $('product-form').addEventListener('submit',event=>{
+    event.preventDefault();
+    const name=$('new-name').value.trim(), category=$('new-category').value, mode=document.querySelector('input[name="mode"]:checked').value;
+    const price=mode==='fixed'?Number($('new-price').value):null;
+    if(!name||(mode==='fixed'&&(!Number.isFinite(price)||price<=0))){alert('راجع اسم المنتج والسعر.');return;}
+    products.push({id:nextProduct++,name,category,mode,price});
+    $('new-name').value='';$('new-price').value='5';
+    renderProducts();renderProductTable();alert('تمت إضافة المنتج إلى القائمة التجريبية.');
+  });
+  function renderProductTable() {
+    $('product-rows').innerHTML=products.map(p=>'<tr><td>'+p.id+'</td><td>'+escapeHtml(p.name)+'</td><td>'+escapeHtml(p.category)+'</td><td>'+(p.mode==='fixed'?'محدد':'يطلب عند البيع')+'</td><td>'+(p.mode==='fixed'?money(p.price):'—')+'</td></tr>').join('');
+  }
+
+  function buildReceipt(order) {
+    const lines=order.lines.map(x=>'<tr><td>'+escapeHtml(x.name)+'</td><td>'+x.quantity+'</td><td>'+money(x.unitPrice)+'</td><td>'+money(x.quantity*x.unitPrice)+'</td></tr>').join('');
+    return '<div><h1>مطعم تجريبي</h1><div class="center">فاتورة طلب</div><div class="rule"></div><div class="meta">رقم الطلب: '+order.number+'<br>اسم الزبون: '+escapeHtml(order.customer)+'<br>التاريخ والوقت: '+escapeHtml(order.createdAt)+'<br>نوع الطلب: '+escapeHtml(order.type)+'</div><div class="rule"></div><table><thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>'+lines+'</tbody></table><div class="rule"></div><div class="total"><span>الإجمالي</span><span>'+money(order.total)+'</span></div><div class="rule"></div><div class="center">يرجى تقديم الفاتورة للعامل</div></div>';
+  }
+  function printOrder(order) {
+    $('print-root').innerHTML=buildReceipt(order);
+    window.print();
+  }
+  $('confirm').addEventListener('click',()=>{
+    const customer=$('customer').value.trim();
+    if(!customer){alert('أدخل اسم الزبون أولاً.');$('customer').focus();return;}
+    if(!cart.length){alert('أضف منتجاً إلى الطلب.');return;}
+    const total=cart.reduce((n,x)=>n+x.quantity*x.unitPrice,0);
+    const order={number:String(nextOrder++).padStart(5,'0'),customer,type:orderType,payment:$('payment').value,walletSender:$('payment').value==='محفظة إلكترونية'?$('wallet-sender').value.trim():'',createdAt:new Intl.DateTimeFormat('ar',{dateStyle:'short',timeStyle:'short'}).format(new Date()),lines:cart.map(x=>({...x})),total,status:'جديد'};
+    orders.unshift(order);
+    cart=[];$('customer').value='';$('wallet-sender').value='';$('payment').value='نقداً';$('wallet-wrap').classList.add('hidden');renderCart();renderOrders();renderReports();
+    printOrder(order);
+  });
+  function renderOrders() {
+    $('order-rows').innerHTML=orders.length?orders.map(o=>'<tr><td>'+o.number+'</td><td>'+escapeHtml(o.createdAt)+'</td><td>'+escapeHtml(o.customer)+'</td><td>'+escapeHtml(o.type)+'</td><td>'+money(o.total)+'</td><td><span class="status '+(o.status==='تم التسليم'?'delivered':o.status==='ملغي'?'cancelled':'new')+'">'+o.status+'</span></td><td><div class="actions"><button data-action="delivered" data-id="'+o.number+'">تسليم</button><button data-action="cancel" data-id="'+o.number+'">إلغاء</button><button data-action="reprint" data-id="'+o.number+'">إعادة طباعة</button></div></td></tr>').join(''):'<tr><td colspan="7">لا توجد طلبات.</td></tr>';
+    $('order-rows').querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{
+      const o=orders.find(x=>x.number===btn.dataset.id);if(!o)return;
+      if(btn.dataset.action==='delivered') o.status='تم التسليم';
+      if(btn.dataset.action==='cancel'){const reason=prompt('سبب الإلغاء:');if(reason===null)return;o.status='ملغي';o.cancelReason=reason;}
+      if(btn.dataset.action==='reprint'){printOrder(o);return;}
+      renderOrders();renderReports();
+    }));
+  }
+  function renderReports() {
+    const sum=orders.filter(o=>o.status!=='ملغي').reduce((n,o)=>n+o.total,0);
+    $('r-orders').textContent=String(orders.length);$('r-sales').textContent=money(sum);
+    $('r-delivered').textContent=String(orders.filter(o=>o.status==='تم التسليم').length);
+    $('r-cancelled').textContent=String(orders.filter(o=>o.status==='ملغي').length);
+    $('report-rows').innerHTML=orders.length?orders.map(o=>'<tr><td>'+o.number+'</td><td>'+escapeHtml(o.customer)+'</td><td>'+escapeHtml(o.type)+'</td><td>'+escapeHtml(o.payment)+'</td><td>'+escapeHtml(o.walletSender||'—')+'</td><td>'+money(o.total)+'</td><td>'+escapeHtml(o.status)+'</td></tr>').join(''):'<tr><td colspan="7">لا توجد بيانات.</td></tr>';
+  }
+  $('csv').addEventListener('click',()=>{
+    const rows=[['رقم الطلب','الزبون','نوع الطلب','طريقة الدفع','رقم المحوّل منه','الإجمالي','الحالة'],...orders.map(o=>[o.number,o.customer,o.type,o.payment,o.walletSender,o.total,o.status])];
+    const csv='\uFEFF'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    const a=document.createElement('a');a.href=url;a.download='sales-report.csv';a.click();URL.revokeObjectURL(url);
+  });
+  document.addEventListener('keydown',event=>{
+    if(event.key==='F2'&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)){event.preventDefault();$('search').focus();}
+    if(event.key==='F5'&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)){event.preventDefault();$('confirm').click();}
+  });
+  renderCategories();renderProducts();renderCart();renderProductTable();renderOrders();renderReports();
+})();
+</script>
+</body>
+</html>
