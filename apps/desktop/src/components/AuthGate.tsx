@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { authApi, setSessionToken, type AuthSession, type SetupStatus } from "../lib/posApi";
 
 type Props = {
@@ -38,7 +38,7 @@ export function AuthGate({ enabled, onAuthenticated }: Props) {
     onAuthenticated(session);
   };
 
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     if (!/^[A-Za-z0-9._-]{3,40}$/.test(username.trim())) {
