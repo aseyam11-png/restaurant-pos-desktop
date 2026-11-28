@@ -249,6 +249,22 @@ export interface CashMovement {
 }
 
 
+export interface DatabaseConfigStatus {
+  configured: boolean;
+  host: string | null;
+  port: number | null;
+  database: string | null;
+  username: string | null;
+}
+
+export interface DatabaseConfigInput {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+}
+
 export interface SetupStatus {
   initialized: boolean;
 }
@@ -289,6 +305,20 @@ export function setSessionToken(token: string | null) {
 }
 
 export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+export async function databaseConfigStatus(): Promise<DatabaseConfigStatus> {
+  return invoke<DatabaseConfigStatus>("database_config_status");
+}
+
+export async function configureDatabase(input: DatabaseConfigInput): Promise<DatabaseConfigStatus> {
+  return invoke<DatabaseConfigStatus>("configure_database", {
+    host: input.host,
+    port: input.port,
+    database: input.database,
+    username: input.username,
+    password: input.password,
+  });
+}
 
 export async function apiStatus(): Promise<ApiStatus> {
   return invoke<ApiStatus>("api_status");
