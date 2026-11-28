@@ -289,3 +289,5 @@ tbody tr:hover { background: #1d2326; }
   .auth-card { padding: 24px 19px; }
   .signed-in-user { display: none; }
 }
+
+.staff-password-required { display: inline-block; color: #e2ac82; font-size: 9px; margin-inline-start: 5px; }
