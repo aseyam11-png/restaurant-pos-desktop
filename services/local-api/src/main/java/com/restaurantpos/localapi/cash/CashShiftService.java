@@ -49,7 +49,7 @@ public class CashShiftService {
         jdbc.update("""
             INSERT INTO cash_shifts(id, status, currency, opening_cash, expected_cash, opened_by)
             VALUES (?, 'OPEN', ?, ?, 0, ?)
-            """, id, currency, opening, opening, request.openedBy().trim());
+            """, id, currency, opening, request.openedBy().trim());
 
         if (opening.signum() > 0) {
             recordMovementLocked(
