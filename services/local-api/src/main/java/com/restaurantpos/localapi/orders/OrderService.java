@@ -376,12 +376,20 @@ public class OrderService {
             orderId
         );
         String nextPaymentStatus = "REFUNDED".equals(current.paymentStatus()) ? "REFUNDED" : "UNPAID";
+        UUID diningTableId = jdbc.query(
+            "SELECT dining_table_id FROM orders WHERE id = ?",
+            rs -> rs.next() ? rs.getObject(1, UUID.class) : null,
+            orderId
+        );
         jdbc.update("""
             UPDATE orders
-            SET preparation_status = 'CANCELLED', payment_status = ?,
+            SET preparation_status = 'CANCELLED', payment_status = ?, dining_table_id = NULL,
                 cancelled_at = now(), cancellation_reason = ?, updated_at = now()
             WHERE id = ?
             """, nextPaymentStatus, reason.trim(), orderId);
+        if (diningTableId != null) {
+            jdbc.update("UPDATE dining_tables SET status = 'AVAILABLE', updated_at = now() WHERE id = ?", diningTableId);
+        }
         jdbc.update("""
             INSERT INTO audit_events(id, aggregate_type, aggregate_id, event_type, actor, reason, payload)
             VALUES (?, 'ORDER', ?, 'ORDER_CANCELLED', 'LOCAL_OPERATOR', ?, '{}'::jsonb)
@@ -482,7 +490,22 @@ public class OrderService {
         if (!allowed) {
             throw PosException.conflict("INVALID_PREPARATION_TRANSITION", "The requested preparation status transition is not allowed.");
         }
-        jdbc.update("UPDATE orders SET preparation_status = ?, updated_at = now() WHERE id = ?", nextStatus.name(), orderId);
+        if (nextStatus == PreparationStatus.DELIVERED) {
+            UUID diningTableId = jdbc.query(
+                "SELECT dining_table_id FROM orders WHERE id = ?",
+                rs -> rs.next() ? rs.getObject(1, UUID.class) : null,
+                orderId
+            );
+            jdbc.update(
+                "UPDATE orders SET preparation_status = ?, dining_table_id = NULL, updated_at = now() WHERE id = ?",
+                nextStatus.name(), orderId
+            );
+            if (diningTableId != null) {
+                jdbc.update("UPDATE dining_tables SET status = 'AVAILABLE', updated_at = now() WHERE id = ?", diningTableId);
+            }
+        } else {
+            jdbc.update("UPDATE orders SET preparation_status = ?, updated_at = now() WHERE id = ?", nextStatus.name(), orderId);
+        }
         jdbc.update("""
             INSERT INTO audit_events(id, aggregate_type, aggregate_id, event_type, actor, payload)
             VALUES (?, 'ORDER', ?, 'PREPARATION_STATUS_CHANGED', 'LOCAL_OPERATOR', '{}'::jsonb)
