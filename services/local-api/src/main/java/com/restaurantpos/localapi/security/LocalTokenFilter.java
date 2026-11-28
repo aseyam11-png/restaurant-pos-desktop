@@ -3,7 +3,9 @@ package com.restaurantpos.localapi.security;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Map;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,9 +19,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class LocalTokenFilter extends OncePerRequestFilter {
     private final String configuredToken;
+    private final ObjectMapper objectMapper;
 
-    public LocalTokenFilter(@Value("${pos.security.local-token:}") String configuredToken) {
+    public LocalTokenFilter(
+        @Value("${pos.security.local-token:}") String configuredToken,
+        ObjectMapper objectMapper
+    ) {
         this.configuredToken = configuredToken == null ? "" : configuredToken.trim();
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -54,13 +61,19 @@ public class LocalTokenFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private static void writeError(HttpServletResponse response, String code, String message) throws IOException {
+    private void writeError(HttpServletResponse response, String code, String message) throws IOException {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setHeader("Cache-Control", "no-store");
-        response.getWriter().write(
-            "{"type":"about:blank","title":"Unauthorized","status":"
-                + response.getStatus() + ","code":"" + code + "","detail":"" + message + ""}"
-        );
+        String title = response.getStatus() == HttpServletResponse.SC_UNAUTHORIZED
+            ? "Unauthorized"
+            : "Service unavailable";
+        objectMapper.writeValue(response.getOutputStream(), Map.of(
+            "type", "about:blank",
+            "title", title,
+            "status", response.getStatus(),
+            "code", code,
+            "detail", message
+        ));
     }
 }
