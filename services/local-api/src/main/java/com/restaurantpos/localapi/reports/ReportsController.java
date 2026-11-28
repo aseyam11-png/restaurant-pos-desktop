@@ -59,7 +59,6 @@ public class ReportsController {
             FROM payments p
             JOIN orders o ON o.id = p.order_id
             WHERE o.created_at >= ? AND o.created_at < ?
-              AND o.preparation_status <> 'CANCELLED'
             """,
             rs -> rs.next() ? new PaymentTotals(
                 rs.getBigDecimal("collected"),

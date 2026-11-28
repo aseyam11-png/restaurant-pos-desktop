@@ -200,10 +200,17 @@ public class CashShiftService {
             referenceType, referenceId, description, actor
         );
         BigDecimal expectedDelta = direction == Direction.IN ? amount : amount.negate();
-        jdbc.update(
-            "UPDATE cash_shifts SET expected_cash = expected_cash + ? WHERE id = ? AND status = 'OPEN'",
-            expectedDelta, shiftId
+        int shiftUpdated = jdbc.update(
+            """
+            UPDATE cash_shifts
+            SET expected_cash = expected_cash + ?
+            WHERE id = ? AND status = 'OPEN' AND expected_cash + ? >= 0
+            """,
+            expectedDelta, shiftId, expectedDelta
         );
+        if (shiftUpdated == 0) {
+            throw PosException.conflict("INSUFFICIENT_CASH_FLOAT", "This cash-out movement exceeds the expected cash available in the drawer.");
+        }
         OffsetDateTime createdAt = jdbc.queryForObject(
             "SELECT created_at FROM cash_movements WHERE id = ?",
             OffsetDateTime.class,
