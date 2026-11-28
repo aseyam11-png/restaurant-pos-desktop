@@ -595,6 +595,51 @@ public class OrderService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public com.restaurantpos.localapi.printing.CustomerDocumentDtos.CustomerOrderDocument customerDocument(UUID orderId) {
+        var header = jdbc.query(
+            """
+            SELECT id, order_no, customer_name, order_type, created_at,
+                   subtotal, discount_amount, tax_amount, total, currency
+            FROM orders WHERE id = ?
+            """,
+            rs -> rs.next() ? new CustomerDocumentHeader(
+                rs.getObject("id", UUID.class),
+                rs.getLong("order_no"),
+                rs.getString("customer_name"),
+                rs.getString("order_type"),
+                rs.getObject("created_at", OffsetDateTime.class),
+                rs.getBigDecimal("subtotal"),
+                rs.getBigDecimal("discount_amount"),
+                rs.getBigDecimal("tax_amount"),
+                rs.getBigDecimal("total"),
+                rs.getString("currency").trim()
+            ) : null,
+            orderId
+        );
+        if (header == null) throw PosException.notFound("Order was not found.");
+
+        List<com.restaurantpos.localapi.printing.CustomerDocumentDtos.CustomerOrderLine> lines = jdbc.query(
+            """
+            SELECT product_name_snapshot, unit_snapshot, quantity, unit_price, line_total
+            FROM order_lines WHERE order_id = ? ORDER BY id
+            """,
+            (rs, row) -> new com.restaurantpos.localapi.printing.CustomerDocumentDtos.CustomerOrderLine(
+                rs.getString("product_name_snapshot"),
+                rs.getString("unit_snapshot"),
+                rs.getBigDecimal("quantity"),
+                rs.getBigDecimal("unit_price"),
+                rs.getBigDecimal("line_total")
+            ),
+            orderId
+        );
+        return new com.restaurantpos.localapi.printing.CustomerDocumentDtos.CustomerOrderDocument(
+            header.id(), header.orderNumber(), header.customerName(), header.orderType(),
+            header.createdAt(), header.subtotal(), header.discountAmount(), header.taxAmount(),
+            header.total(), header.currency(), lines
+        );
+    }
+
     private ProductForSale findProductForSale(UUID productId) {
         ProductForSale product = jdbc.query(
             """
@@ -661,6 +706,11 @@ public class OrderService {
         );
     }
 
+    private record CustomerDocumentHeader(
+        UUID id, long orderNumber, String customerName, String orderType,
+        OffsetDateTime createdAt, BigDecimal subtotal, BigDecimal discountAmount,
+        BigDecimal taxAmount, BigDecimal total, String currency
+    ) {}
     private record IdempotencyRow(String requestHash, UUID orderId) {}
     private record ProductForSale(UUID id, long productNumber, String name, String unit, PricingMode pricingMode, BigDecimal price, boolean stockTracked) {}
     private record StockReturn(UUID productId, BigDecimal quantity) {}
