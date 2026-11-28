@@ -91,8 +91,13 @@ public class CashShiftService {
         }
 
         BigDecimal expected = jdbc.queryForObject("""
-            SELECT COALESCE(SUM(amount) FILTER (WHERE direction = 'IN'), 0)
-                 - COALESCE(SUM(amount) FILTER (WHERE direction = 'OUT'), 0)
+            SELECT CAST(
+                ROUND(
+                    COALESCE(SUM(amount) FILTER (WHERE direction = 'IN'), 0)
+                    - COALESCE(SUM(amount) FILTER (WHERE direction = 'OUT'), 0),
+                    2
+                ) AS NUMERIC(14,2)
+            )
             FROM cash_movements WHERE shift_id = ?
             """, BigDecimal.class, shiftId);
         expected = money(expected);

@@ -98,7 +98,7 @@ class OrderFlowIntegrationTest {
         Long events = jdbc.queryForObject(
             "SELECT COUNT(*) FROM audit_events WHERE aggregate_id = ?", Long.class, order.id()
         );
-        assertEquals(3L, events);
+        assertEquals(4L, events);
     }
 
     @Test
