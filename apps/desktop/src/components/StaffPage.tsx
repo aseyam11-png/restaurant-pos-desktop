@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { posApi, type StaffUser } from "../lib/posApi";
 
 type Props = { enabled: boolean };
@@ -17,7 +17,7 @@ export function StaffPage({ enabled }: Props) {
     if (enabled) void refresh().catch((error) => setNotice({ kind: "error", message: String(error) }));
   }, [enabled]);
 
-  const create = async (event: React.FormEvent<HTMLFormElement>) => {
+  const create = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!/^[A-Za-z0-9._-]{3,40}$/.test(username.trim()) || displayName.trim().length < 2 || password.length < 12) {
       setNotice({ kind: "error", message: "تحقق من اسم المستخدم والاسم الظاهر وكلمة المرور (12 حرفًا على الأقل)." });
