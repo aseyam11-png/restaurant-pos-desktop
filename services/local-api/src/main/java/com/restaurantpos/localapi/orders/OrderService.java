@@ -178,7 +178,9 @@ public class OrderService {
             """, UUID.randomUUID(), orderId);
 
         Long orderNumber = jdbc.queryForObject("SELECT order_no FROM orders WHERE id = ?", Long.class, orderId);
-        String outboxPayload = "{"eventVersion":1,"orderId":"" + orderId + "","orderNumber":" + orderNumber + "}";
+        String outboxPayload = """
+            {"eventVersion":1,"orderId":"%s","orderNumber":%d}
+            """.formatted(orderId, orderNumber);
         jdbc.update("""
             INSERT INTO outbox_events(id, aggregate_type, aggregate_id, event_type, payload)
             VALUES (?, 'ORDER', ?, 'ORDER_CREATED', CAST(? AS jsonb))
