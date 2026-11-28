@@ -8,17 +8,46 @@ use std::{
 
 use rand::{rngs::OsRng, RngCore};
 use reqwest::{Client, Method};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Manager, State};
 
 const API_BASE_URL: &str = "http://127.0.0.1:17890";
 
+#[derive(Clone)]
+struct RuntimeDatabaseConfig {
+    host: String,
+    port: u16,
+    database: String,
+    username: String,
+    password: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DatabaseConfigFile {
+    host: String,
+    port: u16,
+    database: String,
+    username: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DatabaseConfigStatus {
+    configured: bool,
+    host: Option<String>,
+    port: Option<u16>,
+    database: Option<String>,
+    username: Option<String>,
+}
+
 struct PosApiState {
     client: Client,
     token: String,
     child: Mutex<Option<Child>>,
-    startup_error: Option<String>,
+    startup_error: Mutex<Option<String>>,
+    database_config: Mutex<Option<RuntimeDatabaseConfig>>,
 }
 
 #[derive(Serialize)]
@@ -34,7 +63,11 @@ fn generate_local_token() -> String {
     hex::encode(bytes)
 }
 
-fn start_local_api(app: &AppHandle, token: &str) -> Result<Child, String> {
+fn start_local_api(
+    app: &AppHandle,
+    token: &str,
+    database: &RuntimeDatabaseConfig,
+) -> Result<Child, String> {
     let resource_dir = app.path().resource_dir().map_err(|error| error.to_string())?;
     let jar_path = resource_dir.join("restaurant-pos-local-api.jar");
 
@@ -49,11 +82,12 @@ fn start_local_api(app: &AppHandle, token: &str) -> Result<Child, String> {
         .env("POS_BIND_ADDRESS", "127.0.0.1")
         .env("POS_LOCAL_API_PORT", "17890")
         .env("POS_SECURITY_LOCAL_TOKEN", token)
-        .env("POS_DB_URL", std::env::var("POS_DB_URL").unwrap_or_else(|_| {
-            "jdbc:postgresql://127.0.0.1:5432/restaurant_pos".to_string()
-        }))
-        .env("POS_DB_USERNAME", std::env::var("POS_DB_USERNAME").unwrap_or_else(|_| "restaurant_pos".to_string()))
-        .env("POS_DB_PASSWORD", std::env::var("POS_DB_PASSWORD").unwrap_or_default())
+        .env(
+            "POS_DB_URL",
+            format!("jdbc:postgresql://{}:{}/{}", database.host, database.port, database.database),
+        )
+        .env("POS_DB_USERNAME", &database.username)
+        .env("POS_DB_PASSWORD", &database.password)
         .env("POS_CURRENCY", std::env::var("POS_CURRENCY").unwrap_or_else(|_| "ILS".to_string()))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -62,13 +96,168 @@ fn start_local_api(app: &AppHandle, token: &str) -> Result<Child, String> {
         .map_err(|error| format!("Could not start the local API process: {error}"))
 }
 
+fn validate_database_config(
+    host: &str,
+    port: u16,
+    database: &str,
+    username: &str,
+    password: &str,
+) -> Result<RuntimeDatabaseConfig, String> {
+    if !matches!(host, "localhost" | "127.0.0.1" | "::1") {
+        return Err("For this single-computer release, PostgreSQL must listen on localhost.".to_string());
+    }
+    if port == 0 {
+        return Err("PostgreSQL port must be between 1 and 65535.".to_string());
+    }
+    let valid_identifier = |value: &str| {
+        !value.is_empty()
+            && value.len() <= 63
+            && value.as_bytes()[0].is_ascii_alphabetic()
+            && value.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    };
+    if !valid_identifier(database) || !valid_identifier(username) {
+        return Err("Database and username must be valid PostgreSQL identifiers.".to_string());
+    }
+    if password.is_empty() || password.len() > 256 || password.contains('\0') {
+        return Err("Database password must contain 1 to 256 characters.".to_string());
+    }
+    Ok(RuntimeDatabaseConfig {
+        host: host.to_string(),
+        port,
+        database: database.to_string(),
+        username: username.to_string(),
+        password: password.to_string(),
+    })
+}
+
+fn database_password_entry() -> Result<keyring::Entry, String> {
+    keyring::Entry::new("com.restaurantpos.desktop", "postgresql-password")
+        .map_err(|error| format!("Could not access the operating-system credential vault: {error}"))
+}
+
+fn persist_database_config(
+    app: &AppHandle,
+    config: &RuntimeDatabaseConfig,
+) -> Result<(), String> {
+    let directory = app.path().app_config_dir().map_err(|error| error.to_string())?;
+    std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    let file_path = directory.join("database.json");
+    let temporary_path = directory.join("database.json.tmp");
+    let file_config = DatabaseConfigFile {
+        host: config.host.clone(),
+        port: config.port,
+        database: config.database.clone(),
+        username: config.username.clone(),
+    };
+    let bytes = serde_json::to_vec_pretty(&file_config).map_err(|error| error.to_string())?;
+    std::fs::write(&temporary_path, bytes).map_err(|error| error.to_string())?;
+    std::fs::rename(&temporary_path, &file_path).map_err(|error| error.to_string())?;
+    database_password_entry()?
+        .set_password(&config.password)
+        .map_err(|error| format!("Could not store the database password securely: {error}"))?;
+    Ok(())
+}
+
+fn load_database_config(app: &AppHandle) -> Result<Option<RuntimeDatabaseConfig>, String> {
+    let directory = app.path().app_config_dir().map_err(|error| error.to_string())?;
+    let file_path = directory.join("database.json");
+    if !file_path.exists() {
+        return Ok(None);
+    }
+    let bytes = std::fs::read(&file_path).map_err(|error| error.to_string())?;
+    let file_config: DatabaseConfigFile = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("The saved database configuration is invalid: {error}"))?;
+    let password = database_password_entry()?
+        .get_password()
+        .map_err(|error| format!("The saved database password is unavailable in the OS credential vault: {error}"))?;
+    validate_database_config(
+        &file_config.host,
+        file_config.port,
+        &file_config.database,
+        &file_config.username,
+        &password,
+    ).map(Some)
+}
+
+#[tauri::command]
+fn database_config_status(state: State<'_, PosApiState>) -> DatabaseConfigStatus {
+    match state.database_config.lock() {
+        Ok(config) => match config.as_ref() {
+            Some(config) => DatabaseConfigStatus {
+                configured: true,
+                host: Some(config.host.clone()),
+                port: Some(config.port),
+                database: Some(config.database.clone()),
+                username: Some(config.username.clone()),
+            },
+            None => DatabaseConfigStatus {
+                configured: false,
+                host: None,
+                port: None,
+                database: None,
+                username: None,
+            },
+        },
+        Err(_) => DatabaseConfigStatus {
+            configured: false,
+            host: None,
+            port: None,
+            database: None,
+            username: None,
+        },
+    }
+}
+
+#[tauri::command(rename_all = "camelCase")]
+fn configure_database(
+    app: AppHandle,
+    state: State<'_, PosApiState>,
+    host: String,
+    port: u16,
+    database: String,
+    username: String,
+    password: String,
+) -> Result<DatabaseConfigStatus, String> {
+    let config = validate_database_config(&host, port, &database, &username, &password)?;
+    persist_database_config(&app, &config)?;
+
+    {
+        let mut child = state.child.lock().map_err(|_| "Local API process lock is unavailable.".to_string())?;
+        if let Some(mut running) = child.take() {
+            let _ = running.kill();
+            let _ = running.wait();
+        }
+        match start_local_api(&app, &state.token, &config) {
+            Ok(process) => *child = Some(process),
+            Err(error) => {
+                if let Ok(mut startup_error) = state.startup_error.lock() {
+                    *startup_error = Some(error.clone());
+                }
+                return Err(error);
+            }
+        }
+    }
+    *state.database_config.lock().map_err(|_| "Database configuration lock is unavailable.".to_string())? = Some(config.clone());
+    *state.startup_error.lock().map_err(|_| "Startup state lock is unavailable.".to_string())? = None;
+
+    Ok(DatabaseConfigStatus {
+        configured: true,
+        host: Some(config.host),
+        port: Some(config.port),
+        database: Some(config.database),
+        username: Some(config.username),
+    })
+}
+
 #[tauri::command]
 async fn api_status(state: State<'_, PosApiState>) -> ApiStatus {
-    if let Some(error) = &state.startup_error {
-        return ApiStatus {
-            available: false,
-            message: error.clone(),
-        };
+    if let Ok(error) = state.startup_error.lock() {
+        if let Some(message) = error.as_ref() {
+            return ApiStatus {
+                available: false,
+                message: message.clone(),
+            };
+        }
     }
 
     let health = state.client
@@ -192,10 +381,20 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
         .setup(move |app| {
-            let child = start_local_api(app.handle(), &token_for_setup);
-            let (child, startup_error) = match child {
-                Ok(process) => (Some(process), None),
-                Err(error) => (None, Some(error)),
+            let loaded_config = load_database_config(app.handle())
+                .map_err(|error| std::io::Error::other(error))?;
+            let (database_config, child, startup_error) = match loaded_config {
+                Some(config) => {
+                    match start_local_api(app.handle(), &token_for_setup, &config) {
+                        Ok(process) => (Some(config), Some(process), None),
+                        Err(error) => (Some(config), None, Some(error)),
+                    }
+                }
+                None => (
+                    None,
+                    None,
+                    Some("Configure a local PostgreSQL database to finish first-time setup.".to_string()),
+                ),
             };
 
             let client = Client::builder()
@@ -207,11 +406,17 @@ fn main() {
                 client,
                 token: token_for_setup.clone(),
                 child: Mutex::new(child),
-                startup_error,
+                startup_error: Mutex::new(startup_error),
+                database_config: Mutex::new(database_config),
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![api_status, pos_api_request])
+        .invoke_handler(tauri::generate_handler![
+            api_status,
+            pos_api_request,
+            database_config_status,
+            configure_database,
+        ])
         .build(tauri::generate_context!())
         .expect("failed to build Restaurant POS desktop application");
 
