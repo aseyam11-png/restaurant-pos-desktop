@@ -1,6 +1,5 @@
 package com.restaurantpos.localapi.catalog;
 
-import java.sql.Types;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -119,6 +118,10 @@ public class CatalogService {
             request.price(),
             Boolean.TRUE.equals(request.stockTracked())
         );
+        boolean stockTracked = Boolean.TRUE.equals(request.stockTracked());
+        if (stockTracked) {
+            jdbc.update("INSERT INTO inventory_balances(product_id, quantity_on_hand, minimum_quantity) VALUES (?, 0, 0)", id);
+        }
         return new ProductView(
             id,
             productNumber == null ? 0 : productNumber,
@@ -128,7 +131,7 @@ public class CatalogService {
             request.unit().trim(),
             request.pricingMode(),
             request.price(),
-            Boolean.TRUE.equals(request.stockTracked()),
+            stockTracked,
             true
         );
     }
