@@ -1,0 +1,57 @@
+name: Local API CI
+
+on:
+  push:
+    branches: [main, "phase-0/**"]
+    paths:
+      - "services/local-api/**"
+      - ".github/workflows/local-api-ci.yml"
+  pull_request:
+    paths:
+      - "services/local-api/**"
+      - ".github/workflows/local-api-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-api-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: restaurant_pos
+          POSTGRES_USER: restaurant_pos
+          POSTGRES_PASSWORD: ci-local-api-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U restaurant_pos -d restaurant_pos"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      POS_BIND_ADDRESS: 127.0.0.1
+      POS_LOCAL_API_PORT: 17890
+      POS_DB_URL: jdbc:postgresql://127.0.0.1:5432/restaurant_pos
+      POS_DB_USERNAME: restaurant_pos
+      POS_DB_PASSWORD: ci-local-api-password
+      POS_LOCAL_TOKEN: ci-only-local-token-value-not-for-production
+      POS_CURRENCY: ILS
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Verify migrations, tests and package
+        run: mvn --batch-mode --no-transfer-progress -f services/local-api/pom.xml verify
