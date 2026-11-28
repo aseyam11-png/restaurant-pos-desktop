@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { posApi, type Category, type Product, type PricingMode } from "../lib/posApi";
 
-type Props = { enabled: boolean; onChanged: () => void };
+type Props = { enabled: boolean; currency: string; onChanged: () => void };
 
-export function CatalogAdminPage({ enabled, onChanged }: Props) {
+export function CatalogAdminPage({ enabled, currency, onChanged }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categoryName, setCategoryName] = useState("");
@@ -26,7 +26,7 @@ export function CatalogAdminPage({ enabled, onChanged }: Props) {
     if (enabled) void refresh().catch((error) => setNotice({ kind: "error", message: String(error) }));
   }, [enabled]);
 
-  const addCategory = async (event: React.FormEvent<HTMLFormElement>) => {
+  const addCategory = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!categoryName.trim()) return;
     setBusy(true);
@@ -42,7 +42,7 @@ export function CatalogAdminPage({ enabled, onChanged }: Props) {
     } finally { setBusy(false); }
   };
 
-  const addProduct = async (event: React.FormEvent<HTMLFormElement>) => {
+  const addProduct = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!productCategory || !productName.trim() || !unit.trim()) {
       setNotice({ kind: "error", message: "التصنيف واسم المنتج والوحدة مطلوبة." });
@@ -109,7 +109,7 @@ export function CatalogAdminPage({ enabled, onChanged }: Props) {
           <label>الوحدة<input value={unit} onChange={(event) => setUnit(event.target.value)} maxLength={30} required disabled={!enabled || busy} /></label>
           <label>نظام التسعير<select value={pricingMode} onChange={(event) => setPricingMode(event.target.value as PricingMode)} disabled={!enabled || busy}><option value="FIXED">سعر ثابت</option><option value="ASK_AT_SALE">السعر عند البيع</option></select></label>
         </div>
-        {pricingMode === "FIXED" && <label>السعر ({currencyLabel()})<input value={price} onChange={(event) => setPrice(event.target.value)} inputMode="decimal" required disabled={!enabled || busy} /></label>}
+        {pricingMode === "FIXED" && <label>السعر ({currency})<input value={price} onChange={(event) => setPrice(event.target.value)} inputMode="decimal" required disabled={!enabled || busy} /></label>}
         <label className="inline-checkbox"><input type="checkbox" checked={stockTracked} onChange={(event) => setStockTracked(event.target.checked)} disabled={!enabled || busy} />تتبع مخزون هذا المنتج</label>
         <button className="primary-action" type="submit" disabled={!enabled || busy || !categories.length}>حفظ المنتج</button>
       </form>
@@ -129,4 +129,3 @@ export function CatalogAdminPage({ enabled, onChanged }: Props) {
   </section>;
 }
 
-function currencyLabel() { return "عملة المتجر"; }
