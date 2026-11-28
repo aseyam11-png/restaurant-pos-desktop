@@ -35,7 +35,8 @@ public final class OrderDtos {
         PENDING_CONFIRMATION,
         PARTIALLY_PAID,
         PAID,
-        REFUNDED
+        REFUNDED,
+        VOIDED
     }
 
     public enum PaymentMethod {
