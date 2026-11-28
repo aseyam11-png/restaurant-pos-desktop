@@ -99,6 +99,7 @@ async fn pos_api_request(
     path: String,
     body: Option<Value>,
     idempotency_key: Option<String>,
+    session_token: Option<String>,
 ) -> Result<Value, String> {
     if !path.starts_with("/api/v1/")
         || path.contains("..")
@@ -128,6 +129,13 @@ async fn pos_api_request(
             return Err("Idempotency-Key must contain 1 to 128 characters.".to_string());
         }
         request = request.header("Idempotency-Key", key);
+    }
+
+    if let Some(token) = session_token {
+        if token.trim().is_empty() || token.len() > 256 {
+            return Err("The local user session token is invalid.".to_string());
+        }
+        request = request.header("Authorization", format!("Bearer {}", token));
     }
 
     if let Some(json) = body {
