@@ -57,6 +57,11 @@ class OrderFlowIntegrationTest {
         );
         assertEquals("0591234567", storedSender);
         assertFalse(first.toString().contains(storedSender));
+        var customerDocument = orders.customerDocument(first.id());
+        assertFalse(customerDocument.toString().contains(storedSender));
+        assertEquals("Integration customer", customerDocument.customerName());
+        assertEquals(1, customerDocument.lines().size());
+        assertFalse(customerDocument.toString().contains(Long.toString(product.productNumber())));
 
         String idempotencyKey = "replay-" + UUID.randomUUID();
         OrderView original = orders.createOrder(idempotencyKey, request);
