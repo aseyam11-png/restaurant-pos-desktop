@@ -253,13 +253,22 @@ export async function apiRequest<T>(
   body?: unknown,
   idempotencyKey?: string,
 ): Promise<T> {
-  return invoke<T>("pos_api_request", {
-    method,
-    path,
-    body: body ?? null,
-    idempotencyKey: idempotencyKey ?? null,
-    sessionToken: activeSessionToken,
-  });
+  try {
+    return await invoke<T>("pos_api_request", {
+      method,
+      path,
+      body: body ?? null,
+      idempotencyKey: idempotencyKey ?? null,
+      sessionToken: activeSessionToken,
+    });
+  } catch (error) {
+    const message = String(error);
+    if (activeSessionToken && message.includes("HTTP 401")) {
+      activeSessionToken = null;
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("pos:unauthorized"));
+    }
+    throw error;
+  }
 }
 
 export const authApi = {
