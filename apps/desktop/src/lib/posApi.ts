@@ -203,6 +203,44 @@ export interface CashMovement {
   createdAt: string;
 }
 
+
+export interface SetupStatus {
+  initialized: boolean;
+}
+
+export interface AuthSession {
+  accessToken: string;
+  tokenType: "Bearer";
+  expiresAt: string;
+  userId: string;
+  username: string;
+  displayName: string;
+  role: "OWNER" | "MANAGER" | "CASHIER";
+}
+
+export interface CurrentUser {
+  userId: string;
+  username: string;
+  displayName: string;
+  role: "OWNER" | "MANAGER" | "CASHIER";
+  sessionExpiresAt: string;
+}
+
+export interface StaffUser {
+  userId: string;
+  username: string;
+  displayName: string;
+  role: "MANAGER" | "CASHIER";
+  active: boolean;
+  createdAt: string;
+}
+
+let activeSessionToken: string | null = null;
+
+export function setSessionToken(token: string | null) {
+  activeSessionToken = token;
+}
+
 export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export async function apiStatus(): Promise<ApiStatus> {
@@ -220,8 +258,19 @@ export async function apiRequest<T>(
     path,
     body: body ?? null,
     idempotencyKey: idempotencyKey ?? null,
+    sessionToken: activeSessionToken,
   });
 }
+
+export const authApi = {
+  setupStatus: () => apiRequest<SetupStatus>("GET", "/api/v1/auth/setup-status"),
+  bootstrap: (body: { username: string; displayName: string; password: string }) =>
+    apiRequest<AuthSession>("POST", "/api/v1/auth/bootstrap", body),
+  login: (body: { username: string; password: string }) =>
+    apiRequest<AuthSession>("POST", "/api/v1/auth/login", body),
+  me: () => apiRequest<CurrentUser>("GET", "/api/v1/auth/me"),
+  logout: () => apiRequest<null>("POST", "/api/v1/auth/logout"),
+};
 
 export const posApi = {
   categories: () => apiRequest<Category[]>("GET", "/api/v1/catalog/categories"),
@@ -249,6 +298,11 @@ export const posApi = {
     if (to) params.set("to", to);
     return apiRequest<SalesSummary>("GET", `/api/v1/reports/sales/summary?${params.toString()}`);
   },
+  staff: () => apiRequest<StaffUser[]>("GET", "/api/v1/users"),
+  createStaff: (body: { username: string; displayName: string; temporaryPassword: string; role: "MANAGER" | "CASHIER" }) =>
+    apiRequest<StaffUser>("POST", "/api/v1/users", body),
+  deactivateStaff: (id: string) =>
+    apiRequest<null>("PATCH", `/api/v1/users/${encodeURIComponent(id)}/deactivate`),
   suppliers: () => apiRequest<Supplier[]>("GET", "/api/v1/suppliers"),
   createSupplier: (body: { name: string; phone?: string; email?: string; notes?: string }) =>
     apiRequest<Supplier>("POST", "/api/v1/suppliers", body),
