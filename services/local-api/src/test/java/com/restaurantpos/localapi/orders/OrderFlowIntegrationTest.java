@@ -153,4 +153,37 @@ class OrderFlowIntegrationTest {
         assertEquals(IndividualPaymentStatus.VOIDED, cancelled.payments().get(0).status());
         assertFalse(cancelled.toString().contains("0597654321"));
     }
+    @Test
+    void cashSaleRefundAndPrePreparationCancellationReconcileCashAndInventory() {
+        cashShifts.open(new OpenShiftRequest(new BigDecimal("100.00"), "Owner"));
+        var category = catalog.createCategory(new CreateCategoryRequest("StockSale-" + UUID.randomUUID(), 0));
+        var product = catalog.createProduct(new CreateProductRequest(
+            category.id(), "Tracked product", "piece", PricingMode.FIXED,
+            new BigDecimal("5.00"), true
+        ));
+        inventory.recordMovement(new RecordMovementRequest(
+            product.id(), MovementType.RECEIPT, new BigDecimal("5.000"), "Opening stock", "Owner"
+        ));
+
+        OrderView order = orders.createOrder("stock-sale-" + UUID.randomUUID(), new CreateOrderRequest(
+            "Stock customer", OrderType.TAKEAWAY,
+            List.of(new OrderLineRequest(product.id(), new BigDecimal("2.000"), null)),
+            BigDecimal.ZERO, BigDecimal.ZERO, "ILS",
+            List.of(new PaymentRequest(PaymentMethod.CASH, new BigDecimal("10.00"), null))
+        ));
+
+        assertEquals(PaymentStatus.PAID, order.paymentStatus());
+        assertEquals(new BigDecimal("110.00"), cashShifts.active().expectedCash());
+        assertEquals(new BigDecimal("3.000"), inventory.listBalances("Tracked product", false, 10).get(0).quantityOnHand());
+
+        OrderView refunded = orders.refundOrder(order.id(), "Customer return", "Owner");
+        assertEquals(PaymentStatus.REFUNDED, refunded.paymentStatus());
+        assertEquals(new BigDecimal("100.00"), cashShifts.active().expectedCash());
+
+        OrderView cancelled = orders.cancelOrder(order.id(), "Returned before preparation");
+        assertEquals(PreparationStatus.CANCELLED, cancelled.preparationStatus());
+        assertEquals(PaymentStatus.REFUNDED, cancelled.paymentStatus());
+        assertEquals(new BigDecimal("5.000"), inventory.listBalances("Tracked product", false, 10).get(0).quantityOnHand());
+    }
+
 }
