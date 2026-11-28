@@ -48,7 +48,7 @@ public class CashShiftService {
         UUID id = UUID.randomUUID();
         jdbc.update("""
             INSERT INTO cash_shifts(id, status, currency, opening_cash, expected_cash, opened_by)
-            VALUES (?, 'OPEN', ?, ?, ?, ?)
+            VALUES (?, 'OPEN', ?, ?, 0, ?)
             """, id, currency, opening, opening, request.openedBy().trim());
 
         if (opening.signum() > 0) {
@@ -198,6 +198,11 @@ public class CashShiftService {
             """,
             id, shiftId, type.name(), direction.name(), amount,
             referenceType, referenceId, description, actor
+        );
+        BigDecimal expectedDelta = direction == Direction.IN ? amount : amount.negate();
+        jdbc.update(
+            "UPDATE cash_shifts SET expected_cash = expected_cash + ? WHERE id = ? AND status = 'OPEN'",
+            expectedDelta, shiftId
         );
         OffsetDateTime createdAt = jdbc.queryForObject(
             "SELECT created_at FROM cash_movements WHERE id = ?",
