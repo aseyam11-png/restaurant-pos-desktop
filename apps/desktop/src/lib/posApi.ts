@@ -149,6 +149,7 @@ export interface Supplier {
   email?: string | null;
   notes?: string | null;
   active: boolean;
+  mustChangePassword: boolean;
   createdAt: string;
 }
 
@@ -216,6 +217,7 @@ export interface AuthSession {
   username: string;
   displayName: string;
   role: "OWNER" | "MANAGER" | "CASHIER";
+  mustChangePassword: boolean;
 }
 
 export interface CurrentUser {
@@ -224,6 +226,7 @@ export interface CurrentUser {
   displayName: string;
   role: "OWNER" | "MANAGER" | "CASHIER";
   sessionExpiresAt: string;
+  mustChangePassword: boolean;
 }
 
 export interface StaffUser {
@@ -278,6 +281,8 @@ export const authApi = {
   login: (body: { username: string; password: string }) =>
     apiRequest<AuthSession>("POST", "/api/v1/auth/login", body),
   me: () => apiRequest<CurrentUser>("GET", "/api/v1/auth/me"),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    apiRequest<AuthSession>("POST", "/api/v1/auth/change-password", body),
   logout: () => apiRequest<null>("POST", "/api/v1/auth/logout"),
 };
 
