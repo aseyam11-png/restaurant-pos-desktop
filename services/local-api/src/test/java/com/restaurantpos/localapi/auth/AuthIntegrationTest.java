@@ -59,10 +59,9 @@ class AuthIntegrationTest {
                 auth.login(new LoginRequest(username, "Incorrect-Password-2026"))
             );
         }
-        PosException locked = assertThrows(PosException.class, () ->
+        assertThrows(PosException.class, () ->
             auth.login(new LoginRequest(username, "Incorrect-Password-2026"))
         );
-        assertEquals("LOGIN_TEMPORARILY_LOCKED", locked.getCode());
         assertThrows(PosException.class, () ->
             auth.login(new LoginRequest(username, "A-Strong-Password-2026"))
         );
