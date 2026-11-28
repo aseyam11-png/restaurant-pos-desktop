@@ -35,8 +35,7 @@ public final class OrderDtos {
         PENDING_CONFIRMATION,
         PARTIALLY_PAID,
         PAID,
-        REFUNDED,
-        VOIDED
+        REFUNDED
     }
 
     public enum PaymentMethod {
@@ -48,7 +47,8 @@ public final class OrderDtos {
     public enum IndividualPaymentStatus {
         PENDING_CONFIRMATION,
         CONFIRMED,
-        REFUNDED
+        REFUNDED,
+        VOIDED
     }
 
     public record OrderLineRequest(
