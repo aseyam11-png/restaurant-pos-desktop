@@ -61,6 +61,7 @@ These are candidate decisions. Validate service lifecycle, database packaging, r
 10. Never commit credentials, customer data, wallet secrets, signing keys, or production backups.
 
 ## Current status
-This repository currently contains product and engineering foundations. Production desktop UI, local API, PostgreSQL schema, printer integration, sync, licensing, and installers are not implemented yet.
+
+The `phase-0/engineering-baseline` branch adds an initial React/TypeScript + Tauri desktop shell and a Phase 0 engineering audit. The shell is a development foundation only: it does not process sales, persist business records, call a local API, print receipts, or provide production installers. The TypeScript/Vite CI gate is configured; a successful CI run and Windows/macOS runtime verification are still required. Local API, database schema, printer integration, sync, licensing, and production installers remain unimplemented.
 
 See [PRD](docs/product/PRD.md), [architecture](docs/architecture/overview.md), [quality gates](docs/quality/performance-and-quality-gates.md), and [roadmap](docs/roadmap.md).
