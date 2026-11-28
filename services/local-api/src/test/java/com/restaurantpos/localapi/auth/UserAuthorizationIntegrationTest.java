@@ -97,4 +97,42 @@ class UserAuthorizationIntegrationTest {
         assertEquals("Authenticated Cashier", openedBy);
         assertNotEquals("Forged Owner", openedBy);
     }
+    @Test
+    void temporaryPasswordMustBeChangedBeforeProtectedEndpointsAreAvailable() throws Exception {
+        auth.bootstrap(new BootstrapRequest(
+            "owner_" + UUID.randomUUID().toString().substring(0, 8),
+            "Owner", "A-Strong-Password-2026"
+        ));
+        String cashierName = "first_" + UUID.randomUUID().toString().substring(0, 8);
+        auth.createStaff(new CreateStaffRequest(
+            cashierName, "First Login Cashier", "A-Temporary-Password-2026", StaffRole.CASHIER
+        ));
+        String temporaryToken = auth.login(
+            new LoginRequest(cashierName, "A-Temporary-Password-2026")
+        ).accessToken();
+
+        mvc.perform(get("/api/v1/catalog/products")
+            .header("X-POS-Local-Token", "integration-test-token")
+            .header("Authorization", "Bearer " + temporaryToken))
+            .andExpect(status().isForbidden());
+
+        String body = mapper.writeValueAsString(new ChangePasswordRequest(
+            "A-Temporary-Password-2026", "A-New-Strong-Password-2026"
+        ));
+        String response = mvc.perform(post("/api/v1/auth/change-password")
+            .header("X-POS-Local-Token", "integration-test-token")
+            .header("Authorization", "Bearer " + temporaryToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+        String newToken = mapper.readTree(response).get("accessToken").asText();
+        assertFalse(newToken.isBlank());
+
+        mvc.perform(get("/api/v1/catalog/products")
+            .header("X-POS-Local-Token", "integration-test-token")
+            .header("Authorization", "Bearer " + newToken))
+            .andExpect(status().isOk());
+    }
+
 }
