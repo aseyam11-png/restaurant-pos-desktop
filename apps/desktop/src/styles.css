@@ -218,3 +218,47 @@ tbody tr:hover { background: #1d2326; }
   .receipt-dialog { width: 100% !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: #fff !important; }
   .receipt-actions, .receipt-dialog > .primary-action { display: none !important; }
 }
+
+
+.operations-panel { display: flex; flex-direction: column; gap: 14px; }
+.inline-notice { padding: 10px 12px; border-radius: 5px; border: 1px solid #405447; background: #1b2921; color: #baddc7; font-size: 10px; }
+.inline-notice.error { border-color: #67473f; background: #2a201e; color: #edc0b4; }
+.operation-forms { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(250px,.75fr); gap: 13px; }
+.operation-form-card { display: flex; flex-direction: column; gap: 11px; padding: 16px; border: 1px solid #353e42; border-radius: 6px; background: #1c2225; min-width: 0; }
+.operation-form-card h3 { margin: 0 0 4px; color: #e8e8e2; font-size: 12px; font-weight: 600; }
+.operation-form-card label { display: grid; gap: 6px; color: #9da7aa; font-size: 10px; }
+.operation-form-card input, .operation-form-card select, .settlement-cell input, .settlement-cell select { width: 100%; min-width: 0; height: 35px; padding: 0 9px; border: 1px solid #3a4448; border-radius: 4px; background: #121719; color: #ebebe6; outline: 0; font-size: 10px; }
+.operation-form-card input:focus, .operation-form-card select:focus { border-color: #a8754d; }
+.form-row { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.form-row.three { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.form-submit { align-self: start; }
+.form-hint { color: #818c90; font-size: 9px; line-height: 1.7; margin: 1px 0 0; }
+.supplier-count { display: flex; align-items: baseline; gap: 8px; padding-top: 13px; border-top: 1px solid #333c40; color: #8d999e; font-size: 9px; }
+.supplier-count strong { color: #e4b28a; font-size: 23px; font-weight: 600; }
+.panel-subheading { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 13px; padding: 0 0 10px; border-bottom: 1px solid #30383c; }
+.panel-subheading h3 { margin: 0; color: #e2e3de; font-size: 12px; font-weight: 600; }
+.panel-subheading span { color: #808b8f; font-size: 9px; }
+.settlement-cell { display: flex; align-items: center; gap: 5px; min-width: 280px; }
+.settlement-cell input { width: 75px; }
+.settlement-cell select { width: 90px; }
+.settlement-cell button { height: 33px; padding: 0 9px; border: 1px solid #735238; border-radius: 4px; background: #31251d; color: #e6b48a; font-size: 9px; }
+.expense-form { margin-bottom: 10px; }
+.form-action { display: flex; align-items: end; }
+.form-action .primary-action { margin: 0; }
+.cash-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; margin-bottom: 4px; }
+.cash-metrics article { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #343d41; border-radius: 5px; background: #1d2326; }
+.cash-metrics small { color: #909b9f; font-size: 9px; }
+.cash-metrics strong { color: #e6b48b; font-size: 15px; font-weight: 600; }
+.cash-open-form { width: min(100%,420px); }
+.cash-open-form .primary-action { margin-top: 2px; }
+.money-in { color: #8ec7a7; }
+.money-out { color: #e19a86; }
+@media (max-width: 850px) {
+  .operation-forms { grid-template-columns: 1fr; }
+  .cash-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 560px) {
+  .form-row, .form-row.three { grid-template-columns: 1fr; }
+  .settlement-cell { min-width: 255px; }
+  .cash-metrics strong { font-size: 13px; }
+}
