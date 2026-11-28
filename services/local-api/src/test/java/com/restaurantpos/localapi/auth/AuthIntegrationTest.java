@@ -86,4 +86,29 @@ class AuthIntegrationTest {
         auth.deactivateStaff(staff.userId());
         assertFalse(auth.listStaff().stream().filter(x -> x.userId().equals(staff.userId())).findFirst().orElseThrow().active());
     }
+    @Test
+    void staffMustChangeTemporaryPasswordAndOldSessionIsRevoked() {
+        auth.bootstrap(new BootstrapRequest(
+            "pwowner_" + java.util.UUID.randomUUID().toString().substring(0, 8),
+            "Owner", "A-Strong-Password-2026"
+        ));
+        String username = "staff_" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        auth.createStaff(new CreateStaffRequest(
+            username, "New Cashier", "A-Temporary-Password-2026", StaffRole.CASHIER
+        ));
+        AuthSession firstLogin = auth.login(new LoginRequest(username, "A-Temporary-Password-2026"));
+        assertTrue(firstLogin.mustChangePassword());
+        assertTrue(auth.authenticate(firstLogin.accessToken()).mustChangePassword());
+
+        AuthSession changed = auth.changePassword(firstLogin.accessToken(),
+            new ChangePasswordRequest("A-Temporary-Password-2026", "A-New-Strong-Password-2026"));
+        assertFalse(changed.mustChangePassword());
+        assertNull(auth.authenticate(firstLogin.accessToken()));
+        assertFalse(auth.authenticate(changed.accessToken()).mustChangePassword());
+        assertThrows(PosException.class, () -> auth.login(
+            new LoginRequest(username, "A-Temporary-Password-2026")
+        ));
+        assertNotNull(auth.login(new LoginRequest(username, "A-New-Strong-Password-2026")));
+    }
+
 }
