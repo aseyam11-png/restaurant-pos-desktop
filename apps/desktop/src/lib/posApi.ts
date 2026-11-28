@@ -128,6 +128,26 @@ export interface DiningTable {
   activeOrderNumber: number;
 }
 
+
+export interface DeliveryRider {
+  id: string;
+  name: string;
+  phone: string;
+  notes?: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface DeliveryAssignment {
+  orderId: string;
+  orderNumber: number;
+  riderId?: string | null;
+  riderName?: string | null;
+  riderPhone?: string | null;
+  address?: string | null;
+  customerPhone?: string | null;
+}
+
 export interface SalesSummary {
   from: string;
   to: string;
@@ -312,6 +332,15 @@ export const posApi = {
     if (to) params.set("to", to);
     return apiRequest<SalesSummary>("GET", `/api/v1/reports/sales/summary?${params.toString()}`);
   },
+  deliveryRiders: (query = "") => apiRequest<DeliveryRider[]>("GET", `/api/v1/delivery/riders${query ? `?query=${encodeURIComponent(query)}` : ""}`),
+  createDeliveryRider: (body: { name: string; phone: string; notes?: string }) =>
+    apiRequest<DeliveryRider>("POST", "/api/v1/delivery/riders", body),
+  deactivateDeliveryRider: (id: string) =>
+    apiRequest<null>("PATCH", `/api/v1/delivery/riders/${encodeURIComponent(id)}/deactivate`),
+  deliveryAssignment: (orderId: string) =>
+    apiRequest<DeliveryAssignment>("GET", `/api/v1/orders/${encodeURIComponent(orderId)}/delivery`),
+  assignDeliveryRider: (orderId: string, body: { riderId: string | null; address: string; phone: string }) =>
+    apiRequest<DeliveryAssignment>("PUT", `/api/v1/orders/${encodeURIComponent(orderId)}/delivery`, body),
   staff: () => apiRequest<StaffUser[]>("GET", "/api/v1/users"),
   createStaff: (body: { username: string; displayName: string; temporaryPassword: string; role: "MANAGER" | "CASHIER" }) =>
     apiRequest<StaffUser>("POST", "/api/v1/users", body),
