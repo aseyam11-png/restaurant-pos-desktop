@@ -242,7 +242,7 @@ export function ExpensesPage({ enabled, currency, onChanged }: PageProps) {
   </section>;
 }
 
-export function CashPage({ enabled, currency, onChanged }: PageProps) {
+export function CashPage({ enabled, currency, canManage, onChanged }: PageProps & { canManage: boolean }) {
   const [shift, setShift] = useState<CashShift | null>(null);
   const [movements, setMovements] = useState<CashMovement[]>([]);
   const [opening, setOpening] = useState("0");
@@ -256,7 +256,7 @@ export function CashPage({ enabled, currency, onChanged }: PageProps) {
   const refresh = async () => {
     const active = await posApi.activeCashShift();
     setShift(active);
-    setMovements(active ? await posApi.cashMovements(active.id) : []);
+    setMovements(active && canManage ? await posApi.cashMovements(active.id) : []);
   };
   useEffect(() => {
     if (enabled) void refresh().catch((error) => setNotice({ kind: "error", message: errorMessage(error) }));
@@ -333,7 +333,7 @@ export function CashPage({ enabled, currency, onChanged }: PageProps) {
         <article><small>النقد المتوقع</small><strong>{money(shift.expectedCash, shift.currency)}</strong></article>
         <article><small>تاريخ الفتح</small><strong>{new Date(shift.openedAt).toLocaleString("ar-PS")}</strong></article>
       </div>
-      <div className="operation-forms">
+      {canManage && <div className="operation-forms">
         <div className="operation-form-card">
           <h3>إضافة حركة نقدية</h3>
           <label>نوع الحركة<select value={movementType} onChange={(e) => setMovementType(e.target.value as "CASH_IN" | "CASH_OUT")}><option value="CASH_IN">إيداع نقدي</option><option value="CASH_OUT">سحب نقدي</option></select></label>
@@ -347,12 +347,12 @@ export function CashPage({ enabled, currency, onChanged }: PageProps) {
           <p className="form-hint">سيحسب النظام فرق الصندوق بين النقد المتوقع والمعدود، ويحفظه ضمن سجل الوردية.</p>
           <button className="primary-action" onClick={() => void close()} disabled={!enabled || busy}>إغلاق الوردية</button>
         </div>
-      </div>
-      <div className="panel-subheading"><h3>دفتر حركات الصندوق</h3><span>{movements.length} حركة</span></div>
+      </div>}
+      {canManage && <div className="panel-subheading"><h3>دفتر حركات الصندوق</h3><span>{movements.length} حركة</span></div>
       <div className="table-scroll"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الوصف</th><th>الاتجاه</th><th>المبلغ</th></tr></thead><tbody>
         {movements.map((movement) => <tr key={movement.id}><td>{new Date(movement.createdAt).toLocaleString("ar-PS")}</td><td>{movement.movementType}</td><td>{movement.description || "—"}</td><td>{movement.direction === "IN" ? "داخل" : "خارج"}</td><td className={movement.direction === "IN" ? "money-in" : "money-out"}>{movement.direction === "IN" ? "+" : "−"}{money(movement.amount, shift.currency)}</td></tr>)}
         {!movements.length && <tr><td colSpan={5} className="empty-table">لا توجد حركات بعد.</td></tr>}
-      </tbody></table></div>
+      </tbody></table></div>}
     </>}
   </section>;
 }
