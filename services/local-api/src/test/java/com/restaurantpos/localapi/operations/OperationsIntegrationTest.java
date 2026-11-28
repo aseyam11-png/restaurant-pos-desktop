@@ -17,6 +17,8 @@ import com.restaurantpos.localapi.inventory.InventoryService;
 import com.restaurantpos.localapi.orders.OrderDtos.PaymentMethod;
 import com.restaurantpos.localapi.purchases.PurchaseDtos.*;
 import com.restaurantpos.localapi.purchases.PurchaseService;
+import com.restaurantpos.localapi.purchases.SupplierPaymentDtos.RecordPaymentRequest;
+import com.restaurantpos.localapi.purchases.SupplierPaymentService;
 import com.restaurantpos.localapi.suppliers.SupplierDtos.CreateSupplierRequest;
 import com.restaurantpos.localapi.suppliers.SupplierService;
 
@@ -36,6 +38,7 @@ class OperationsIntegrationTest {
     @Autowired private InventoryService inventory;
     @Autowired private SupplierService suppliers;
     @Autowired private PurchaseService purchases;
+    @Autowired private SupplierPaymentService supplierPayments;
     @Autowired private ExpenseService expenses;
     @Autowired private JdbcTemplate jdbc;
 
@@ -158,4 +161,50 @@ class OperationsIntegrationTest {
         );
         assertEquals(1L, movements);
     }
+    @Test
+    void supplierPaymentsSettleOutstandingBalanceIdempotently() {
+        var category = catalog.createCategory(new CreateCategoryRequest("SupplierPay-" + UUID.randomUUID(), 0));
+        var product = catalog.createProduct(new CreateProductRequest(
+            category.id(), "Supplier pay product", "pack", PricingMode.FIXED,
+            new BigDecimal("10.00"), true
+        ));
+        PurchaseView purchase = purchases.create("supplier-pay-purchase-" + UUID.randomUUID(),
+            new CreatePurchaseRequest(
+                null,
+                List.of(new PurchaseLineRequest(product.id(), new BigDecimal("1.000"), new BigDecimal("10.00"))),
+                BigDecimal.ZERO, BigDecimal.ZERO, null, "ILS", "Owner", OffsetDateTime.now()
+            )
+        );
+        assertEquals("UNPAID", purchase.paymentStatus());
+        assertEquals(new BigDecimal("10.00"), purchase.dueAmount());
+
+        String firstKey = "supplier-payment-" + UUID.randomUUID();
+        var first = supplierPayments.record(
+            purchase.id(), firstKey,
+            new RecordPaymentRequest(new BigDecimal("3.00"), PaymentMethod.BANK_CARD, "Owner")
+        );
+        var replay = supplierPayments.record(
+            purchase.id(), firstKey,
+            new RecordPaymentRequest(new BigDecimal("3.00"), PaymentMethod.BANK_CARD, "Owner")
+        );
+        assertEquals(first.id(), replay.id());
+        assertEquals(new BigDecimal("3.00"), first.purchasePaidTotal());
+        assertEquals(new BigDecimal("7.00"), first.purchaseDueTotal());
+        assertEquals("PARTIALLY_PAID", first.purchasePaymentStatus());
+
+        var finalPayment = supplierPayments.record(
+            purchase.id(), "supplier-payment-final-" + UUID.randomUUID(),
+            new RecordPaymentRequest(new BigDecimal("7.00"), PaymentMethod.WALLET, "Owner")
+        );
+        assertEquals(new BigDecimal("10.00"), finalPayment.purchasePaidTotal());
+        assertEquals(new BigDecimal("0.00"), finalPayment.purchaseDueTotal());
+        assertEquals("PAID", finalPayment.purchasePaymentStatus());
+        assertEquals(2, supplierPayments.list(purchase.id()).size());
+
+        assertThrows(PosException.class, () -> supplierPayments.record(
+            purchase.id(), "supplier-payment-over-" + UUID.randomUUID(),
+            new RecordPaymentRequest(new BigDecimal("0.01"), PaymentMethod.BANK_CARD, "Owner")
+        ));
+    }
+
 }
