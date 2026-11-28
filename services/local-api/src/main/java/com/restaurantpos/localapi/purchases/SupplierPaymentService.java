@@ -122,6 +122,33 @@ public class SupplierPaymentService {
     }
 
     @Transactional(readOnly = true)
+    public java.util.List<SupplierPaymentView> list(UUID purchaseId) {
+        Boolean exists = jdbc.query(
+            "SELECT TRUE FROM purchases WHERE id = ?",
+            rs -> rs.next() ? rs.getBoolean(1) : null,
+            purchaseId
+        );
+        if (!Boolean.TRUE.equals(exists)) throw PosException.notFound("Purchase was not found.");
+        return jdbc.query("""
+            SELECT sp.id, sp.purchase_id, sp.method, sp.amount, sp.currency, sp.cash_shift_id,
+                   sp.paid_at, sp.recorded_by, p.paid_amount, p.due_amount, p.payment_status
+            FROM supplier_payments sp JOIN purchases p ON p.id = sp.purchase_id
+            WHERE sp.purchase_id = ?
+            ORDER BY sp.paid_at, sp.id
+            """,
+            (rs, row) -> new SupplierPaymentView(
+                rs.getObject("id", UUID.class), rs.getObject("purchase_id", UUID.class),
+                PaymentMethod.valueOf(rs.getString("method")), rs.getBigDecimal("amount"),
+                rs.getString("currency").trim(), rs.getObject("cash_shift_id", UUID.class),
+                rs.getObject("paid_at", OffsetDateTime.class), rs.getString("recorded_by"),
+                rs.getBigDecimal("paid_amount"), rs.getBigDecimal("due_amount"),
+                rs.getString("payment_status")
+            ),
+            purchaseId
+        );
+    }
+
+    @Transactional(readOnly = true)
     public SupplierPaymentView get(UUID paymentId) {
         return jdbc.query("""
             SELECT sp.id, sp.purchase_id, sp.method, sp.amount, sp.currency, sp.cash_shift_id,
