@@ -300,7 +300,7 @@ public class OrderService {
             Long.class,
             orderId
         );
-        if (confirmedPayments != null && confirmedPayments > 0) {
+        if (confirmedPayments > 0) {
             throw PosException.conflict(
                 "REFUND_REQUIRED",
                 "This order has confirmed payments. Complete an audited refund before cancellation is available."
