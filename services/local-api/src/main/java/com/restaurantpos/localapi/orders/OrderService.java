@@ -650,7 +650,7 @@ public class OrderService {
     ) {}
     private record OrderHeaderForUpdate(String preparationStatus, String paymentStatus) {}
     private record RefundOrderHeader(String paymentStatus) {}
-    private record RefundablePayment(UUID id, BigDecimal amount, String currency) {}
+    private record RefundablePayment(UUID id, BigDecimal amount, String currency, String method) {}
     private record PaymentStatusRow(BigDecimal total, String status, String preparationStatus) {}
     private record PaymentTotals(BigDecimal confirmed, BigDecimal pending) {}
 }

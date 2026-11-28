@@ -9,6 +9,8 @@ import com.restaurantpos.localapi.catalog.CatalogDtos.CreateCategoryRequest;
 import com.restaurantpos.localapi.catalog.CatalogDtos.CreateProductRequest;
 import com.restaurantpos.localapi.catalog.CatalogDtos.PricingMode;
 import com.restaurantpos.localapi.catalog.CatalogService;
+import com.restaurantpos.localapi.cash.CashShiftService;
+import com.restaurantpos.localapi.cash.CashShiftDtos.OpenShiftRequest;
 import com.restaurantpos.localapi.orders.OrderDtos.*;
 
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class OrderFlowIntegrationTest {
     @Autowired private CatalogService catalog;
     @Autowired private OrderService orders;
+    @Autowired private CashShiftService cashShifts;
     @Autowired private JdbcTemplate jdbc;
 
     @Test
@@ -100,6 +103,7 @@ class OrderFlowIntegrationTest {
 
     @Test
     void refundIsAuditedIdempotentAndCanBeFollowedByCancellation() {
+        cashShifts.open(new OpenShiftRequest(BigDecimal.ZERO, "Owner"));
         var category = catalog.createCategory(new CreateCategoryRequest("Refund-" + UUID.randomUUID(), 0));
         var product = catalog.createProduct(new CreateProductRequest(
             category.id(), "Refund product", "piece", PricingMode.FIXED,
