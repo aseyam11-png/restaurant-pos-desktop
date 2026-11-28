@@ -141,6 +141,68 @@ export interface SalesSummary {
   reportingTimeZone: string;
 }
 
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface PurchaseLineView {
+  id: string;
+  productId: string;
+  productNumber: number;
+  productName: string;
+  unit: string;
+  quantity: number;
+  unitCost: number;
+  lineTotal: number;
+}
+
+export interface PurchaseView {
+  id: string;
+  purchaseNumber: number;
+  supplierId?: string | null;
+  status: string;
+  paymentStatus: string;
+  subtotal: number;
+  discountAmount: number;
+  total: number;
+  paidAmount: number;
+  dueAmount: number;
+  currency: string;
+  paymentMethod?: PaymentMethod | null;
+  purchasedAt: string;
+  createdBy: string;
+  lines: PurchaseLineView[];
+}
+
+export interface ExpenseView {
+  id: string;
+  category: string;
+  description: string;
+  amount: number;
+  currency: string;
+  paymentMethod: PaymentMethod;
+  cashShiftId?: string | null;
+  incurredAt: string;
+  createdBy: string;
+}
+
+export interface CashMovement {
+  id: string;
+  movementType: string;
+  direction: "IN" | "OUT";
+  amount: number;
+  description?: string | null;
+  actor: string;
+  createdAt: string;
+}
+
 export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export async function apiStatus(): Promise<ApiStatus> {
@@ -187,4 +249,24 @@ export const posApi = {
     if (to) params.set("to", to);
     return apiRequest<SalesSummary>("GET", `/api/v1/reports/sales/summary?${params.toString()}`);
   },
+  suppliers: () => apiRequest<Supplier[]>("GET", "/api/v1/suppliers"),
+  createSupplier: (body: { name: string; phone?: string; email?: string; notes?: string }) =>
+    apiRequest<Supplier>("POST", "/api/v1/suppliers", body),
+  purchases: (limit = 100) => apiRequest<PurchaseView[]>("GET", `/api/v1/purchases?limit=${limit}`),
+  createPurchase: (body: unknown, key: string) =>
+    apiRequest<PurchaseView>("POST", "/api/v1/purchases", body, key),
+  supplierPayment: (purchaseId: string, body: { amount: number; method: PaymentMethod; recordedBy: string }, key: string) =>
+    apiRequest<unknown>("POST", `/api/v1/purchases/${encodeURIComponent(purchaseId)}/payments`, body, key),
+  expenses: (limit = 100) => apiRequest<ExpenseView[]>("GET", `/api/v1/expenses?limit=${limit}`),
+  createExpense: (body: unknown, key: string) =>
+    apiRequest<ExpenseView>("POST", "/api/v1/expenses", body, key),
+  cashMovements: (shiftId: string) =>
+    apiRequest<CashMovement[]>("GET", `/api/v1/cash-shifts/${encodeURIComponent(shiftId)}/movements?limit=200`),
+  addCashMovement: (body: { type: "CASH_IN" | "CASH_OUT"; amount: number; description: string; createdBy: string }) =>
+    apiRequest<CashMovement>("POST", "/api/v1/cash-shifts/movements", body),
+  closeCashShift: (shiftId: string, countedCash: number) =>
+    apiRequest<CashShift>("POST", `/api/v1/cash-shifts/${encodeURIComponent(shiftId)}/close`, {
+      countedCash,
+      closedBy: "Local operator",
+    }),
 };
