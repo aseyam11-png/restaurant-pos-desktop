@@ -143,9 +143,6 @@ fn persist_database_config(
     std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
     let file_path = directory.join("database.json");
     let temporary_path = directory.join("database.json.tmp");
-    database_password_entry()?
-        .set_password(&config.password)
-        .map_err(|error| format!("Could not store the database password securely: {error}"))?;
     let file_config = DatabaseConfigFile {
         host: config.host.clone(),
         port: config.port,
@@ -154,13 +151,41 @@ fn persist_database_config(
     };
     let bytes = serde_json::to_vec_pretty(&file_config).map_err(|error| error.to_string())?;
     std::fs::write(&temporary_path, bytes).map_err(|error| error.to_string())?;
-    std::fs::rename(&temporary_path, &file_path).map_err(|error| error.to_string())?;
+
+    let backup_path = directory.join("database.json.bak");
+    if backup_path.exists() {
+        std::fs::remove_file(&backup_path).map_err(|error| error.to_string())?;
+    }
+    let had_previous = file_path.exists();
+    if had_previous {
+        std::fs::rename(&file_path, &backup_path).map_err(|error| error.to_string())?;
+    }
+    if let Err(error) = std::fs::rename(&temporary_path, &file_path) {
+        if had_previous {
+            let _ = std::fs::rename(&backup_path, &file_path);
+        }
+        return Err(error.to_string());
+    }
+    if let Err(error) = database_password_entry()?.set_password(&config.password) {
+        let _ = std::fs::remove_file(&file_path);
+        if had_previous {
+            let _ = std::fs::rename(&backup_path, &file_path);
+        }
+        return Err(format!("Could not store the database password securely: {error}"));
+    }
+    if backup_path.exists() {
+        std::fs::remove_file(&backup_path).map_err(|error| error.to_string())?;
+    }
     Ok(())
 }
 
 fn load_database_config(app: &AppHandle) -> Result<Option<RuntimeDatabaseConfig>, String> {
     let directory = app.path().app_config_dir().map_err(|error| error.to_string())?;
     let file_path = directory.join("database.json");
+    let backup_path = directory.join("database.json.bak");
+    if !file_path.exists() && backup_path.exists() {
+        std::fs::rename(&backup_path, &file_path).map_err(|error| error.to_string())?;
+    }
     if !file_path.exists() {
         return Ok(None);
     }
