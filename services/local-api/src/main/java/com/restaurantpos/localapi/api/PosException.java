@@ -29,4 +29,23 @@ public final class PosException extends RuntimeException {
     public static PosException badRequest(String code, String message) {
         return new PosException(HttpStatus.BAD_REQUEST, code, "Invalid request", message);
     }
+
+    public static PosException unauthorized(String detail) {
+        return new PosException(
+            org.springframework.http.HttpStatus.UNAUTHORIZED,
+            "AUTHENTICATION_REQUIRED",
+            "Authentication required",
+            detail
+        );
+    }
+
+    public static PosException tooManyRequests(String code, String detail) {
+        return new PosException(
+            org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,
+            code,
+            "Too many requests",
+            detail
+        );
+    }
+
 }
