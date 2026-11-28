@@ -39,6 +39,11 @@ public class OrderController {
         return service.getOrder(id);
     }
 
+    @GetMapping("/orders/{id}/customer-document")
+    public com.restaurantpos.localapi.printing.CustomerDocumentDtos.CustomerOrderDocument customerDocument(@PathVariable UUID id) {
+        return service.customerDocument(id);
+    }
+
     @PostMapping("/orders/{id}/cancel")
     public OrderView cancelOrder(@PathVariable UUID id, @Valid @RequestBody CancelOrderRequest request) {
         return service.cancelOrder(id, request.reason());
