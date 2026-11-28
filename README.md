@@ -48,6 +48,14 @@ These are candidate decisions. Validate service lifecycle, database packaging, r
 - `prototype` — UX experiments only.
 - `infra` — packaging and operations.
 
+## Local database prerequisite
+
+The current desktop build includes a first-run PostgreSQL connection screen. It stores the database password in Windows Credential Manager or macOS Keychain and stores only non-secret connection metadata in the application config directory.
+
+PostgreSQL itself is a separate prerequisite in this development release. Install and start a local PostgreSQL server, create the non-superuser application role/database with the scripts under `scripts/database`, then enter the connection details in the application. The application currently supports loopback database connections only.
+
+See [local PostgreSQL setup](docs/operations/local-database-setup.md). The installer does not yet install or bundle PostgreSQL automatically.
+
 ## Non-negotiable rules
 1. Local DB is the source of truth for in-store sales.
 2. Internet is never required to create a local order.
@@ -62,6 +70,8 @@ These are candidate decisions. Validate service lifecycle, database packaging, r
 
 ## Current status
 
-The `phase-0/engineering-baseline` branch adds an initial React/TypeScript + Tauri desktop shell and a Phase 0 engineering audit. The shell is a development foundation only: it does not process sales, persist business records, call a local API, print receipts, or provide production installers. The TypeScript/Vite CI gate is configured; a successful CI run and Windows/macOS runtime verification are still required. Local API, database schema, printer integration, sync, licensing, and production installers remain unimplemented.
+The `phase-0/engineering-baseline` branch now contains a React/TypeScript + Tauri desktop shell, a Spring Boot local API, PostgreSQL/Flyway migrations, initial cashier/catalog/order workflows, inventory and dining operations, purchasing, expenses, cash shifts, delivery riders, local staff authentication, role checks, store settings, server-side tax calculation, and a first-run database connection screen.
+
+These capabilities are under active development and are not yet a production release. The desktop shell currently requires a separately installed local PostgreSQL server; the installer does not bundle PostgreSQL. The printer workflow still relies on the operating-system print dialog and has not passed physical printer verification. Multi-terminal LAN operation, cloud synchronization, mobile manager dashboard, a hardened backup/restore drill, a separate restricted database runtime role, licensing, signed/notarized installers, and integrated Windows/macOS runtime tests remain release gates. CI results must be inspected on the current branch head before any build is described as passing.
 
 See [PRD](docs/product/PRD.md), [architecture](docs/architecture/overview.md), [quality gates](docs/quality/performance-and-quality-gates.md), and [roadmap](docs/roadmap.md).
