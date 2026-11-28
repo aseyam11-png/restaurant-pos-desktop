@@ -11,6 +11,9 @@ import java.util.Locale;
 import java.util.UUID;
 
 import com.restaurantpos.localapi.api.PosException;
+import com.restaurantpos.localapi.cash.CashShiftService;
+import com.restaurantpos.localapi.cash.CashShiftService.Direction;
+import com.restaurantpos.localapi.cash.CashShiftService.MovementType;
 import com.restaurantpos.localapi.catalog.CatalogDtos.PricingMode;
 import com.restaurantpos.localapi.orders.OrderDtos.*;
 
@@ -22,13 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OrderService {
     private final JdbcTemplate jdbc;
+    private final CashShiftService cashShifts;
     private final String defaultCurrency;
 
     public OrderService(
         JdbcTemplate jdbc,
+        CashShiftService cashShifts,
         @Value("${pos.currency:ILS}") String defaultCurrency
     ) {
         this.jdbc = jdbc;
+        this.cashShifts = cashShifts;
         this.defaultCurrency = defaultCurrency.toUpperCase(Locale.ROOT);
     }
 
@@ -110,6 +116,9 @@ public class OrderService {
             throw PosException.badRequest("PAYMENT_EXCEEDS_ORDER", "The payment total cannot exceed the order total.");
         }
 
+        UUID cashShiftId = requestedPayments.stream().anyMatch(p -> p.method() == PaymentMethod.CASH)
+            ? cashShifts.requireOpenShiftForUpdate()
+            : null;
         UUID orderId = UUID.randomUUID();
         jdbc.update("""
             INSERT INTO orders(
@@ -144,29 +153,57 @@ public class OrderService {
                 line.unitPrice(),
                 line.lineTotal()
             );
+            if (line.product().stockTracked()) {
+                int stockUpdated = jdbc.update("""
+                    UPDATE inventory_balances
+                    SET quantity_on_hand = quantity_on_hand - ?, updated_at = now()
+                    WHERE product_id = ? AND quantity_on_hand >= ?
+                    """, line.quantity(), line.product().id(), line.quantity());
+                if (stockUpdated == 0) {
+                    throw PosException.conflict("INSUFFICIENT_STOCK", "A stock-tracked product does not have sufficient available quantity.");
+                }
+                jdbc.update("""
+                    INSERT INTO inventory_movements(
+                        id, product_id, movement_type, quantity_delta, reference_type,
+                        reference_id, reason, created_by
+                    ) VALUES (?, ?, 'SALE', ?, 'ORDER', ?, 'Order accepted', 'LOCAL_OPERATOR')
+                    """, UUID.randomUUID(), line.product().id(), line.quantity().negate(), orderId);
+            }
         }
 
         for (PaymentRequest payment : requestedPayments) {
             IndividualPaymentStatus status = payment.method() == PaymentMethod.CASH
                 ? IndividualPaymentStatus.CONFIRMED
                 : IndividualPaymentStatus.PENDING_CONFIRMATION;
-            String senderPhone = payment.method() == PaymentMethod.WALLET && payment.senderPhone() != null
+            String senderPhone = payment.method() == PaymentMethod.WALLET && payment.senderPhone() != null && !payment.senderPhone().isBlank()
                 ? payment.senderPhone().trim()
                 : null;
+            UUID paymentId = UUID.randomUUID();
+            UUID paymentShiftId = payment.method() == PaymentMethod.CASH ? cashShiftId : null;
+            BigDecimal paymentAmount = OrderPricing.moneyOrZero(payment.amount());
             jdbc.update("""
-                INSERT INTO payments(id, order_id, method, status, amount, currency, sender_phone, confirmed_at, confirmed_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO payments(
+                    id, order_id, method, status, amount, currency, sender_phone,
+                    confirmed_at, confirmed_by, cash_shift_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                UUID.randomUUID(),
+                paymentId,
                 orderId,
                 payment.method().name(),
                 status.name(),
-                payment.amount().setScale(2),
+                paymentAmount,
                 currency,
                 senderPhone,
                 status == IndividualPaymentStatus.CONFIRMED ? OffsetDateTime.now() : null,
-                status == IndividualPaymentStatus.CONFIRMED ? "LOCAL_OPERATOR" : null
+                status == IndividualPaymentStatus.CONFIRMED ? "LOCAL_OPERATOR" : null,
+                paymentShiftId
             );
+            if (payment.method() == PaymentMethod.CASH) {
+                cashShifts.recordMovement(
+                    cashShiftId, MovementType.SALE, Direction.IN, paymentAmount,
+                    "Cash receipt for order " + orderId, "LOCAL_OPERATOR", "PAYMENT", paymentId
+                );
+            }
         }
 
         PaymentStatus paymentStatus = resolvePaymentStatus(orderId, total);
@@ -307,6 +344,33 @@ public class OrderService {
             );
         }
 
+        if ("NEW".equals(current.preparationStatus())) {
+            List<StockReturn> stockReturns = jdbc.query("""
+                SELECT product_id, SUM(-quantity_delta) AS quantity
+                FROM inventory_movements
+                WHERE reference_type = 'ORDER' AND reference_id = ? AND movement_type = 'SALE'
+                GROUP BY product_id
+                """,
+                (rs, row) -> new StockReturn(
+                    rs.getObject("product_id", UUID.class),
+                    rs.getBigDecimal("quantity")
+                ),
+                orderId
+            );
+            for (StockReturn stockReturn : stockReturns) {
+                int changed = jdbc.update(
+                    "UPDATE inventory_balances SET quantity_on_hand = quantity_on_hand + ?, updated_at = now() WHERE product_id = ?",
+                    stockReturn.quantity(), stockReturn.productId()
+                );
+                if (changed == 0) throw PosException.conflict("INVENTORY_BALANCE_MISSING", "Cannot release stock for the cancelled order.");
+                jdbc.update("""
+                    INSERT INTO inventory_movements(
+                        id, product_id, movement_type, quantity_delta, reference_type,
+                        reference_id, reason, created_by
+                    ) VALUES (?, ?, 'CANCEL_RETURN', ?, 'ORDER', ?, ?, 'LOCAL_OPERATOR')
+                    """, UUID.randomUUID(), stockReturn.productId(), stockReturn.quantity(), orderId, reason.trim());
+            }
+        }
         jdbc.update(
             "UPDATE payments SET status = 'VOIDED' WHERE order_id = ? AND status = 'PENDING_CONFIRMATION'",
             orderId
@@ -335,11 +399,12 @@ public class OrderService {
         if (order == null) throw PosException.notFound("Order was not found.");
 
         List<RefundablePayment> refundable = jdbc.query(
-            "SELECT id, amount, currency FROM payments WHERE order_id = ? AND status = 'CONFIRMED' FOR UPDATE",
+            "SELECT id, amount, currency, method FROM payments WHERE order_id = ? AND status = 'CONFIRMED' FOR UPDATE",
             (rs, row) -> new RefundablePayment(
                 rs.getObject("id", UUID.class),
                 rs.getBigDecimal("amount"),
-                rs.getString("currency").trim()
+                rs.getString("currency").trim(),
+                rs.getString("method")
             ),
             orderId
         );
@@ -353,6 +418,9 @@ public class OrderService {
             throw PosException.conflict("NO_CONFIRMED_PAYMENT", "There are no confirmed payments to refund.");
         }
 
+        UUID refundShiftId = refundable.stream().anyMatch(p -> "CASH".equals(p.method()))
+            ? cashShifts.requireOpenShiftForUpdate()
+            : null;
         for (RefundablePayment payment : refundable) {
             jdbc.update("""
                 INSERT INTO payment_refunds(id, order_id, payment_id, amount, currency, reason, refunded_by)
@@ -361,6 +429,12 @@ public class OrderService {
                 UUID.randomUUID(), orderId, payment.id(), payment.amount(), payment.currency(),
                 reason.trim(), refundedBy.trim()
             );
+            if ("CASH".equals(payment.method())) {
+                cashShifts.recordMovement(
+                    refundShiftId, MovementType.REFUND, Direction.OUT, payment.amount(),
+                    "Cash refund for order " + orderId, refundedBy.trim(), "PAYMENT_REFUND", payment.id()
+                );
+            }
             jdbc.update(
                 "UPDATE payments SET status = 'REFUNDED' WHERE id = ? AND order_id = ? AND status = 'CONFIRMED'",
                 payment.id(), orderId
@@ -501,9 +575,9 @@ public class OrderService {
     private ProductForSale findProductForSale(UUID productId) {
         ProductForSale product = jdbc.query(
             """
-            SELECT id, product_no, name, unit, pricing_mode, price
+            SELECT id, product_no, name, unit, pricing_mode, price, stock_tracked
             FROM products WHERE id = ? AND active = TRUE
-            FOR SHARE
+            FOR UPDATE
             """,
             rs -> rs.next() ? new ProductForSale(
                 rs.getObject("id", UUID.class),
@@ -511,7 +585,8 @@ public class OrderService {
                 rs.getString("name"),
                 rs.getString("unit"),
                 PricingMode.valueOf(rs.getString("pricing_mode")),
-                rs.getBigDecimal("price")
+                rs.getBigDecimal("price"),
+                rs.getBoolean("stock_tracked")
             ) : null,
             productId
         );
@@ -564,7 +639,8 @@ public class OrderService {
     }
 
     private record IdempotencyRow(String requestHash, UUID orderId) {}
-    private record ProductForSale(UUID id, long productNumber, String name, String unit, PricingMode pricingMode, BigDecimal price) {}
+    private record ProductForSale(UUID id, long productNumber, String name, String unit, PricingMode pricingMode, BigDecimal price, boolean stockTracked) {}
+    private record StockReturn(UUID productId, BigDecimal quantity) {}
     private record PreparedLine(ProductForSale product, BigDecimal quantity, BigDecimal unitPrice, BigDecimal lineTotal) {}
     private record OrderHeader(
         UUID id, long orderNumber, String customerName, OrderType orderType,
