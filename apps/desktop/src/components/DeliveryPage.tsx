@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { posApi, type DeliveryRider, type OrderView } from "../lib/posApi";
 
 type Props = { enabled: boolean };
@@ -31,7 +31,7 @@ export function DeliveryPage({ enabled }: Props) {
     if (enabled) void refresh().catch((error) => setNotice({ kind: "error", message: String(error) }));
   }, [enabled]);
 
-  const createRider = async (event: React.FormEvent<HTMLFormElement>) => {
+  const createRider = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!riderName.trim() || !riderPhone.trim()) return;
     setBusy(true);
@@ -47,7 +47,7 @@ export function DeliveryPage({ enabled }: Props) {
     } finally { setBusy(false); }
   };
 
-  const assign = async (event: React.FormEvent<HTMLFormElement>) => {
+  const assign = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedOrder || !address.trim() || !phone.trim()) {
       setNotice({ kind: "error", message: "اختر الطلب وأدخل العنوان ورقم هاتف العميل." });
