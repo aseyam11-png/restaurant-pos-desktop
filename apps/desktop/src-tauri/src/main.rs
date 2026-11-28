@@ -462,3 +462,38 @@ fn main() {
         }
     });
 }
+
+
+#[cfg(test)]
+mod database_config_tests {
+    use super::validate_database_config;
+
+    #[test]
+    fn accepts_only_loopback_database_connections() {
+        assert!(validate_database_config(
+            "127.0.0.1", 5432, "restaurant_pos", "restaurant_pos", "secret"
+        ).is_ok());
+        assert!(validate_database_config(
+            "localhost", 5432, "restaurant_pos", "restaurant_pos", "secret"
+        ).is_ok());
+        assert!(validate_database_config(
+            "db.example.com", 5432, "restaurant_pos", "restaurant_pos", "secret"
+        ).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_postgres_identifiers_and_empty_passwords() {
+        assert!(validate_database_config(
+            "127.0.0.1", 5432, "bad-name", "restaurant_pos", "secret"
+        ).is_err());
+        assert!(validate_database_config(
+            "127.0.0.1", 5432, "restaurant_pos", "bad user", "secret"
+        ).is_err());
+        assert!(validate_database_config(
+            "127.0.0.1", 0, "restaurant_pos", "restaurant_pos", "secret"
+        ).is_err());
+        assert!(validate_database_config(
+            "127.0.0.1", 5432, "restaurant_pos", "restaurant_pos", ""
+        ).is_err());
+    }
+}
