@@ -94,7 +94,7 @@ public class SupplierPaymentService {
         String paymentStatus = dueTotal.signum() == 0 ? "PAID" : "PARTIALLY_PAID";
         jdbc.update("""
             UPDATE purchases
-            SET paid_amount = ?, due_amount = ?, payment_status = ?, updated_at = now()
+            SET paid_amount = ?, due_amount = ?, payment_status = ?
             WHERE id = ?
             """, paidTotal, dueTotal, paymentStatus, purchaseId);
 

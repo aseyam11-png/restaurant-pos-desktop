@@ -195,15 +195,6 @@ public class CashShiftService {
         UUID referenceId
     ) {
         UUID id = UUID.randomUUID();
-        jdbc.update("""
-            INSERT INTO cash_movements(
-                id, shift_id, movement_type, direction, amount,
-                reference_type, reference_id, description, actor
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            id, shiftId, type.name(), direction.name(), amount,
-            referenceType, referenceId, description, actor
-        );
         BigDecimal expectedDelta = direction == Direction.IN ? amount : amount.negate();
         int shiftUpdated = jdbc.update(
             """
@@ -216,6 +207,15 @@ public class CashShiftService {
         if (shiftUpdated == 0) {
             throw PosException.conflict("INSUFFICIENT_CASH_FLOAT", "This cash-out movement exceeds the expected cash available in the drawer.");
         }
+        jdbc.update("""
+            INSERT INTO cash_movements(
+                id, shift_id, movement_type, direction, amount,
+                reference_type, reference_id, description, actor
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            id, shiftId, type.name(), direction.name(), amount,
+            referenceType, referenceId, description, actor
+        );
         OffsetDateTime createdAt = jdbc.queryForObject(
             "SELECT created_at FROM cash_movements WHERE id = ?",
             OffsetDateTime.class,
