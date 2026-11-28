@@ -75,7 +75,7 @@ export function StaffPage({ enabled }: Props) {
     <div className="table-scroll"><table><thead><tr><th>الموظف</th><th>اسم المستخدم</th><th>الدور</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>
       {staff.map((user) => <tr key={user.userId}>
         <td>{user.displayName}</td><td>{user.username}</td><td>{user.role === "MANAGER" ? "مدير" : "كاشير"}</td>
-        <td><span className={user.active ? "state-chip" : "state-chip warning"}>{user.active ? "نشط" : "معطل"}</span></td>
+        <td><span className={user.active ? "state-chip" : "state-chip warning"}>{user.active ? "نشط" : "معطل"}</span>{user.mustChangePassword && <small className="staff-password-required"> · تغيير كلمة المرور مطلوب</small>}</td>
         <td>{user.active ? <button className="secondary-action" onClick={() => void deactivate(user)} disabled={!enabled || busy}>تعطيل</button> : "—"}</td>
       </tr>)}
       {!staff.length && <tr><td colSpan={5} className="empty-table">لا توجد حسابات موظفين إضافية.</td></tr>}
