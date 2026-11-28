@@ -1,5 +1,7 @@
 package com.restaurantpos.localapi.purchases;
 
+import com.restaurantpos.localapi.auth.CurrentActor;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -86,7 +88,7 @@ public class SupplierPaymentService {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             paymentId, purchaseId, request.method().name(), amount, purchase.currency(),
-            shiftId, paidAt, request.recordedBy().trim()
+            shiftId, paidAt, CurrentActor.name()
         );
 
         BigDecimal paidTotal = purchase.paid().add(amount).setScale(2);
@@ -102,14 +104,14 @@ public class SupplierPaymentService {
             cash.recordMovement(
                 shiftId, MovementType.PURCHASE, Direction.OUT, amount,
                 "Supplier payment for purchase " + purchaseId,
-                request.recordedBy().trim(), "SUPPLIER_PAYMENT", paymentId
+                CurrentActor.name(), "SUPPLIER_PAYMENT", paymentId
             );
         }
 
         jdbc.update("""
             INSERT INTO audit_events(id, aggregate_type, aggregate_id, event_type, actor, payload)
             VALUES (?, 'PURCHASE', ?, 'SUPPLIER_PAYMENT_RECORDED', ?, '{}'::jsonb)
-            """, UUID.randomUUID(), purchaseId, request.recordedBy().trim());
+            """, UUID.randomUUID(), purchaseId, CurrentActor.name());
         String payload = """
             {"eventVersion":1,"purchaseId":"%s","supplierPaymentId":"%s"}
             """.formatted(purchaseId, paymentId);
