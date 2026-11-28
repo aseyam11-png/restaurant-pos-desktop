@@ -13,6 +13,11 @@ public class SupplierPaymentController {
     private final SupplierPaymentService service;
     public SupplierPaymentController(SupplierPaymentService service) { this.service = service; }
 
+    @GetMapping
+    public java.util.List<SupplierPaymentView> list(@PathVariable UUID purchaseId) {
+        return service.list(purchaseId);
+    }
+
     @PostMapping
     public ResponseEntity<SupplierPaymentView> record(
         @PathVariable UUID purchaseId,
