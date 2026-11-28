@@ -1,5 +1,7 @@
 package com.restaurantpos.localapi.cash;
 
+import com.restaurantpos.localapi.auth.CurrentActor;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
@@ -49,12 +51,12 @@ public class CashShiftService {
         jdbc.update("""
             INSERT INTO cash_shifts(id, status, currency, opening_cash, expected_cash, opened_by)
             VALUES (?, 'OPEN', ?, ?, 0, ?)
-            """, id, currency, opening, request.openedBy().trim());
+            """, id, currency, opening, CurrentActor.name());
 
         if (opening.signum() > 0) {
             recordMovementLocked(
                 id, MovementType.OPENING, Direction.IN, opening,
-                "Opening cash", request.openedBy().trim(), "CASH_SHIFT", id
+                "Opening cash", CurrentActor.name(), "CASH_SHIFT", id
             );
         }
         return getById(id);
@@ -109,7 +111,7 @@ public class CashShiftService {
             SET status = 'CLOSED', expected_cash = ?, counted_cash = ?, variance = ?,
                 closed_by = ?, closed_at = now()
             WHERE id = ? AND status = 'OPEN'
-            """, expected, counted, variance, request.closedBy().trim(), shiftId);
+            """, expected, counted, variance, CurrentActor.name(), shiftId);
         return getById(shiftId);
     }
 
@@ -120,7 +122,7 @@ public class CashShiftService {
         MovementType type = request.type() == ManualMovementType.CASH_IN ? MovementType.CASH_IN : MovementType.CASH_OUT;
         return recordMovement(
             shiftId, type, direction, moneyPositive(request.amount()),
-            request.description().trim(), request.createdBy().trim(), "MANUAL", null
+            request.description().trim(), CurrentActor.name(), "MANUAL", null
         );
     }
 
