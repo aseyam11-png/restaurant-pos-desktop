@@ -103,7 +103,7 @@ fn validate_database_config(
     username: &str,
     password: &str,
 ) -> Result<RuntimeDatabaseConfig, String> {
-    if !matches!(host, "localhost" | "127.0.0.1" | "::1") {
+    if !matches!(host, "localhost" | "127.0.0.1") {
         return Err("For this single-computer release, PostgreSQL must listen on localhost.".to_string());
     }
     if port == 0 {
@@ -143,6 +143,9 @@ fn persist_database_config(
     std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
     let file_path = directory.join("database.json");
     let temporary_path = directory.join("database.json.tmp");
+    database_password_entry()?
+        .set_password(&config.password)
+        .map_err(|error| format!("Could not store the database password securely: {error}"))?;
     let file_config = DatabaseConfigFile {
         host: config.host.clone(),
         port: config.port,
@@ -152,9 +155,6 @@ fn persist_database_config(
     let bytes = serde_json::to_vec_pretty(&file_config).map_err(|error| error.to_string())?;
     std::fs::write(&temporary_path, bytes).map_err(|error| error.to_string())?;
     std::fs::rename(&temporary_path, &file_path).map_err(|error| error.to_string())?;
-    database_password_entry()?
-        .set_password(&config.password)
-        .map_err(|error| format!("Could not store the database password securely: {error}"))?;
     Ok(())
 }
 
@@ -381,8 +381,10 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
         .setup(move |app| {
-            let loaded_config = load_database_config(app.handle())
-                .map_err(|error| std::io::Error::other(error))?;
+            let (loaded_config, configuration_error) = match load_database_config(app.handle()) {
+                Ok(config) => (config, None),
+                Err(error) => (None, Some(error)),
+            };
             let (database_config, child, startup_error) = match loaded_config {
                 Some(config) => {
                     match start_local_api(app.handle(), &token_for_setup, &config) {
@@ -393,7 +395,9 @@ fn main() {
                 None => (
                     None,
                     None,
-                    Some("Configure a local PostgreSQL database to finish first-time setup.".to_string()),
+                    Some(configuration_error.unwrap_or_else(|| {
+                        "Configure a local PostgreSQL database to finish first-time setup.".to_string()
+                    })),
                 ),
             };
 
