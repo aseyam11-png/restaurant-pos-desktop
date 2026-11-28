@@ -293,10 +293,26 @@ public class OrderService {
             throw PosException.conflict("DELIVERED_ORDER_CANNOT_CANCEL", "A delivered order cannot be cancelled. Use an audited refund workflow.");
         }
 
+        long confirmedPayments = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM payments WHERE order_id = ? AND status = 'CONFIRMED'",
+            Long.class,
+            orderId
+        );
+        if (confirmedPayments != null && confirmedPayments > 0) {
+            throw PosException.conflict(
+                "REFUND_REQUIRED",
+                "This order has confirmed payments. Complete an audited refund before cancellation is available."
+            );
+        }
+
+        jdbc.update(
+            "UPDATE payments SET status = 'VOIDED' WHERE order_id = ? AND status = 'PENDING_CONFIRMATION'",
+            orderId
+        );
         jdbc.update("""
             UPDATE orders
-            SET preparation_status = 'CANCELLED', cancelled_at = now(),
-                cancellation_reason = ?, updated_at = now()
+            SET preparation_status = 'CANCELLED', payment_status = 'UNPAID',
+                cancelled_at = now(), cancellation_reason = ?, updated_at = now()
             WHERE id = ?
             """, reason.trim(), orderId);
         jdbc.update("""
