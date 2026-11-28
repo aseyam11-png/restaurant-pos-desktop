@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   posApi,
   type CashMovement,
+  type CashShift,
   type ExpenseView,
   type PaymentMethod,
   type Product,
