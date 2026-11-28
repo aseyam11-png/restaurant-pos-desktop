@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   posApi,
   type CashMovement,
-  type CashShift,
   type ExpenseView,
   type PaymentMethod,
   type Product,
@@ -242,7 +241,7 @@ export function ExpensesPage({ enabled, currency, onChanged }: PageProps) {
   </section>;
 }
 
-export function CashPage({ enabled, currency, onChanged }: PageProps & { shift: CashShift | null; setShift: (shift: CashShift | null) => void }) {
+export function CashPage({ enabled, currency, onChanged }: PageProps) {
   const [shift, setShift] = useState<CashShift | null>(null);
   const [movements, setMovements] = useState<CashMovement[]>([]);
   const [opening, setOpening] = useState("0");
