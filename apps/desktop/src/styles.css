@@ -291,3 +291,10 @@ tbody tr:hover { background: #1d2326; }
 }
 
 .staff-password-required { display: inline-block; color: #e2ac82; font-size: 9px; margin-inline-start: 5px; }
+
+
+.inline-checkbox { display: flex !important; flex-direction: row; align-items: center; gap: 9px !important; }
+.inline-checkbox input { width: 15px !important; height: 15px !important; accent-color: var(--accent); }
+.catalog-admin-forms { grid-template-columns: minmax(220px,.7fr) minmax(320px,1.3fr); }
+.catalog-admin-forms .primary-action { max-width: 220px; }
+@media (max-width: 850px) { .catalog-admin-forms { grid-template-columns: 1fr; } }
