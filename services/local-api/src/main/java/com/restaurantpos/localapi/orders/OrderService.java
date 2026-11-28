@@ -43,7 +43,7 @@ public class OrderService {
     @Transactional
     public OrderView createOrder(String idempotencyKey, CreateOrderRequest request) {
         String configuredCurrency = jdbc.query(
-            "SELECT setting_value FROM store_settings WHERE setting_key = 'currency'",
+            "SELECT setting_value FROM store_settings WHERE setting_key = 'currency' FOR SHARE",
             rs -> rs.next() ? rs.getString(1) : "ILS"
         );
         if (!configuredCurrency.equalsIgnoreCase(request.currency())) {
