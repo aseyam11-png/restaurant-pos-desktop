@@ -194,4 +194,31 @@ class OrderFlowIntegrationTest {
         assertEquals(new BigDecimal("5.000"), inventory.listBalances("Tracked product", false, 10).get(0).quantityOnHand());
     }
 
+    @Test
+    void orderTaxIsCalculatedByServerFromStoreRateAfterDiscount() {
+        jdbc.update("UPDATE store_settings SET setting_value = '7.50' WHERE setting_key = 'tax_rate_percent'");
+        var category = catalog.createCategory(new CreateCategoryRequest("Tax-" + UUID.randomUUID(), 0));
+        var product = catalog.createProduct(new CreateProductRequest(
+            category.id(), "Taxable item", "piece", PricingMode.FIXED, new BigDecimal("10.00"), false
+        ));
+
+        OrderView order = orders.createOrder("tax-" + UUID.randomUUID(), new CreateOrderRequest(
+            "Tax customer", OrderType.TAKEAWAY,
+            List.of(new OrderLineRequest(product.id(), BigDecimal.ONE, null)),
+            new BigDecimal("1.00"), BigDecimal.ZERO, "ILS", List.of()
+        ));
+
+        assertEquals(new BigDecimal("9.00"), order.subtotal().subtract(order.discountAmount()));
+        assertEquals(new BigDecimal("0.68"), order.taxAmount());
+        assertEquals(new BigDecimal("9.68"), order.total());
+
+        assertThrows(PosException.class, () -> orders.createOrder("tax-forged-" + UUID.randomUUID(),
+            new CreateOrderRequest(
+                "Forged tax", OrderType.TAKEAWAY,
+                List.of(new OrderLineRequest(product.id(), BigDecimal.ONE, null)),
+                BigDecimal.ZERO, new BigDecimal("0.01"), "ILS", List.of()
+            )
+        ));
+    }
+
 }
