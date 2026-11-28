@@ -1,4 +1,6 @@
 package com.restaurantpos.localapi.purchases;
+
+import com.restaurantpos.localapi.auth.CurrentActor;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -62,7 +64,7 @@ public class PurchaseService {
   jdbc.update("""
    INSERT INTO purchases(id,supplier_id,status,subtotal,discount_amount,total,paid_amount,due_amount,currency,payment_method,payment_status,cash_shift_id,purchased_at,created_by)
    VALUES(?,?,'POSTED',?,?,?,?,?,?,?,?,?,?,?)
-   """,purchaseId,request.supplierId(),subtotal,discount,total,paid,due,currency,request.paymentMethod()==null?null:request.paymentMethod().name(),paymentStatus,shiftId,purchasedAt,request.createdBy().trim());
+   """,purchaseId,request.supplierId(),subtotal,discount,total,paid,due,currency,request.paymentMethod()==null?null:request.paymentMethod().name(),paymentStatus,shiftId,purchasedAt,CurrentActor.name());
   for(PreparedLine line:lines){
    jdbc.update("""
     INSERT INTO purchase_lines(id,purchase_id,product_id,product_no_snapshot,product_name_snapshot,unit_snapshot,quantity,unit_cost,line_total)
@@ -73,18 +75,18 @@ public class PurchaseService {
    jdbc.update("""
     INSERT INTO inventory_movements(id,product_id,movement_type,quantity_delta,reference_type,reference_id,reason,created_by)
     VALUES(?,?,'PURCHASE',?,'PURCHASE',?,'Supplier purchase posted',?)
-    """,UUID.randomUUID(),line.product().id(),line.quantity(),purchaseId,request.createdBy().trim());
+    """,UUID.randomUUID(),line.product().id(),line.quantity(),purchaseId,CurrentActor.name());
   }
   if(paid.signum()>0){
    jdbc.update("""
     INSERT INTO supplier_payments(id,purchase_id,method,amount,currency,cash_shift_id,paid_at,recorded_by)
     VALUES(?,?,?,?,?,?,?,?)
-    """,UUID.randomUUID(),purchaseId,request.paymentMethod().name(),paid,currency,shiftId,purchasedAt,request.createdBy().trim());
+    """,UUID.randomUUID(),purchaseId,request.paymentMethod().name(),paid,currency,shiftId,purchasedAt,CurrentActor.name());
   }
   if(paid.signum()>0&&request.paymentMethod()==PaymentMethod.CASH){
-   cash.recordMovement(shiftId,MovementType.PURCHASE,Direction.OUT,paid,"Supplier purchase #"+purchaseNumber(purchaseId),request.createdBy().trim(),"PURCHASE",purchaseId);
+   cash.recordMovement(shiftId,MovementType.PURCHASE,Direction.OUT,paid,"Supplier purchase #"+purchaseNumber(purchaseId),CurrentActor.name(),"PURCHASE",purchaseId);
   }
-  jdbc.update("INSERT INTO audit_events(id,aggregate_type,aggregate_id,event_type,actor,payload) VALUES(?,'PURCHASE',?,'PURCHASE_POSTED',?,'{}'::jsonb)",UUID.randomUUID(),purchaseId,request.createdBy().trim());
+  jdbc.update("INSERT INTO audit_events(id,aggregate_type,aggregate_id,event_type,actor,payload) VALUES(?,'PURCHASE',?,'PURCHASE_POSTED',?,'{}'::jsonb)",UUID.randomUUID(),purchaseId,CurrentActor.name());
   String payload=""" 
    {"eventVersion":1,"purchaseId":"%s"}
    """.formatted(purchaseId);
