@@ -110,7 +110,7 @@ public class OrderService {
         }
 
         BigDecimal discount = OrderPricing.moneyOrZero(request.discountAmount());
-        BigDecimal tax = OrderPricing.moneyOrZero(request.taxAmount());
+        BigDecimal tax = calculateStoreTax(subtotal, discount, request.taxAmount());
         BigDecimal total = OrderPricing.orderTotal(subtotal, discount, tax);
         List<PaymentRequest> requestedPayments = request.payments() == null ? List.of() : request.payments();
 
@@ -739,4 +739,25 @@ public class OrderService {
     private record RefundablePayment(UUID id, BigDecimal amount, String currency, String method) {}
     private record PaymentStatusRow(BigDecimal total, String status, String preparationStatus) {}
     private record PaymentTotals(BigDecimal confirmed, BigDecimal pending) {}
+    private BigDecimal calculateStoreTax(
+        BigDecimal subtotal,
+        BigDecimal discountAmount,
+        BigDecimal clientTaxAmount
+    ) {
+        if (clientTaxAmount != null && clientTaxAmount.signum() != 0) {
+            throw PosException.badRequest(
+                "CLIENT_TAX_NOT_ALLOWED",
+                "Tax is calculated by the server from the configured store tax rate."
+            );
+        }
+        BigDecimal rate = jdbc.query(
+            "SELECT setting_value FROM store_settings WHERE setting_key = 'tax_rate_percent'",
+            rs -> rs.next() ? new BigDecimal(rs.getString(1)) : BigDecimal.ZERO
+        );
+        BigDecimal taxableBase = subtotal.subtract(discountAmount).max(BigDecimal.ZERO);
+        return taxableBase.multiply(rate)
+            .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+    }
+
+
 }
