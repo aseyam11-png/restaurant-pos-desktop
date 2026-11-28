@@ -22,6 +22,21 @@ public class DiningService {
   UUID id=UUID.randomUUID();jdbc.update("INSERT INTO dining_tables(id,zone_id,table_number,label,seats) VALUES(?,?,?,?,?)",id,r.zoneId(),r.tableNumber(),r.label().trim(),r.seats());return getTable(id);
  }
  @Transactional(readOnly=true)
+ public List<UnassignedDineInOrderView> listUnassignedDineInOrders(){
+  return jdbc.query("""
+   SELECT id,order_no,customer_name,total,currency,preparation_status,created_at
+   FROM orders
+   WHERE order_type='DINE_IN' AND dining_table_id IS NULL
+     AND preparation_status NOT IN('DELIVERED','CANCELLED')
+   ORDER BY created_at DESC
+   LIMIT 100
+   """,(rs,row)->new UnassignedDineInOrderView(
+    rs.getObject("id",UUID.class),rs.getLong("order_no"),rs.getString("customer_name"),
+    rs.getBigDecimal("total"),rs.getString("currency").trim(),rs.getString("preparation_status"),
+    rs.getObject("created_at",OffsetDateTime.class)
+   ));
+ }
+ @Transactional(readOnly=true)
  public List<TableView> listTables(UUID zoneId,TableStatus status){
   StringBuilder sql=new StringBuilder("""
    SELECT t.id,t.zone_id,z.name zone_name,t.table_number,t.label,t.seats,t.status,t.updated_at,
