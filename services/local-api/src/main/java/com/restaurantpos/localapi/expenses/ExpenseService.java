@@ -1,4 +1,6 @@
 package com.restaurantpos.localapi.expenses;
+
+import com.restaurantpos.localapi.auth.CurrentActor;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -29,9 +31,9 @@ public class ExpenseService {
   if(inserted==0){Existing e=jdbc.queryForObject("SELECT request_hash,expense_id FROM expense_idempotency WHERE idempotency_key=?",(rs,row)->new Existing(rs.getString(1),rs.getObject(2,UUID.class)),key);if(!hash.equals(e.hash()))throw PosException.conflict("IDEMPOTENCY_KEY_REUSED","This key was already used with a different expense.");if(e.expenseId()==null)throw PosException.conflict("IDEMPOTENCY_IN_PROGRESS","The original expense is still processing.");return get(e.expenseId());}
   BigDecimal amount=money(request.amount());UUID shiftId=request.paymentMethod()==PaymentMethod.CASH?cash.requireOpenShiftForUpdate():null;UUID id=UUID.randomUUID();
   OffsetDateTime incurred=request.incurredAt()==null?OffsetDateTime.now():request.incurredAt();
-  jdbc.update("INSERT INTO expenses(id,category,description,amount,currency,payment_method,cash_shift_id,incurred_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)",id,request.category().trim(),request.description().trim(),amount,currency,request.paymentMethod().name(),shiftId,incurred,request.createdBy().trim());
-  if(shiftId!=null)cash.recordMovement(shiftId,MovementType.EXPENSE,Direction.OUT,amount,request.description().trim(),request.createdBy().trim(),"EXPENSE",id);
-  jdbc.update("INSERT INTO audit_events(id,aggregate_type,aggregate_id,event_type,actor,payload) VALUES(?,'EXPENSE',?,'EXPENSE_RECORDED',?,'{}'::jsonb)",UUID.randomUUID(),id,request.createdBy().trim());
+  jdbc.update("INSERT INTO expenses(id,category,description,amount,currency,payment_method,cash_shift_id,incurred_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)",id,request.category().trim(),request.description().trim(),amount,currency,request.paymentMethod().name(),shiftId,incurred,CurrentActor.name());
+  if(shiftId!=null)cash.recordMovement(shiftId,MovementType.EXPENSE,Direction.OUT,amount,request.description().trim(),CurrentActor.name(),"EXPENSE",id);
+  jdbc.update("INSERT INTO audit_events(id,aggregate_type,aggregate_id,event_type,actor,payload) VALUES(?,'EXPENSE',?,'EXPENSE_RECORDED',?,'{}'::jsonb)",UUID.randomUUID(),id,CurrentActor.name());
   jdbc.update("UPDATE expense_idempotency SET expense_id=? WHERE idempotency_key=?",id,key);
   return get(id);
  }
