@@ -307,13 +307,48 @@ public class OrderService {
     }
 
     @Transactional
+    public OrderView changePreparationStatus(UUID orderId, PreparationStatus nextStatus) {
+        String current = jdbc.query(
+            "SELECT preparation_status FROM orders WHERE id = ? FOR UPDATE",
+            rs -> rs.next() ? rs.getString(1) : null,
+            orderId
+        );
+        if (current == null) throw PosException.notFound("Order was not found.");
+        if (nextStatus == PreparationStatus.CANCELLED) {
+            throw PosException.badRequest("USE_CANCEL_ENDPOINT", "Use the audited cancellation endpoint to cancel an order.");
+        }
+        if (current.equals(nextStatus.name())) return getOrder(orderId);
+
+        boolean allowed = switch (current) {
+            case "NEW" -> nextStatus == PreparationStatus.IN_PREPARATION;
+            case "IN_PREPARATION" -> nextStatus == PreparationStatus.READY;
+            case "READY" -> nextStatus == PreparationStatus.DELIVERED;
+            default -> false;
+        };
+        if (!allowed) {
+            throw PosException.conflict("INVALID_PREPARATION_TRANSITION", "The requested preparation status transition is not allowed.");
+        }
+        jdbc.update("UPDATE orders SET preparation_status = ?, updated_at = now() WHERE id = ?", nextStatus.name(), orderId);
+        jdbc.update("""
+            INSERT INTO audit_events(id, aggregate_type, aggregate_id, event_type, actor, payload)
+            VALUES (?, 'ORDER', ?, 'PREPARATION_STATUS_CHANGED', 'LOCAL_OPERATOR', '{}'::jsonb)
+            """, UUID.randomUUID(), orderId);
+        return getOrder(orderId);
+    }
+
+    @Transactional
     public OrderView confirmPayment(UUID orderId, UUID paymentId, String confirmedBy) {
         PaymentStatusRow order = jdbc.query(
-            "SELECT total, payment_status FROM orders WHERE id = ? FOR UPDATE",
-            rs -> rs.next() ? new PaymentStatusRow(rs.getBigDecimal("total"), rs.getString("payment_status")) : null,
+            "SELECT total, payment_status, preparation_status FROM orders WHERE id = ? FOR UPDATE",
+            rs -> rs.next() ? new PaymentStatusRow(
+                rs.getBigDecimal("total"), rs.getString("payment_status"), rs.getString("preparation_status")
+            ) : null,
             orderId
         );
         if (order == null) throw PosException.notFound("Order was not found.");
+        if ("CANCELLED".equals(order.preparationStatus())) {
+            throw PosException.conflict("CANCELLED_ORDER_PAYMENT", "A cancelled order cannot accept payment confirmation.");
+        }
 
         String currentStatus = jdbc.query(
             "SELECT status FROM payments WHERE id = ? AND order_id = ? FOR UPDATE",
@@ -458,6 +493,6 @@ public class OrderService {
         BigDecimal total, String currency, OffsetDateTime createdAt
     ) {}
     private record OrderHeaderForUpdate(String preparationStatus) {}
-    private record PaymentStatusRow(BigDecimal total, String status) {}
+    private record PaymentStatusRow(BigDecimal total, String status, String preparationStatus) {}
     private record PaymentTotals(BigDecimal confirmed, BigDecimal pending) {}
 }
