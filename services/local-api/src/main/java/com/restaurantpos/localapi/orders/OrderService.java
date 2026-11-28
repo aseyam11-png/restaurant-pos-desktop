@@ -1,5 +1,7 @@
 package com.restaurantpos.localapi.orders;
 
+import com.restaurantpos.localapi.auth.CurrentActor;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -195,13 +197,13 @@ public class OrderService {
                 currency,
                 senderPhone,
                 status == IndividualPaymentStatus.CONFIRMED ? OffsetDateTime.now() : null,
-                status == IndividualPaymentStatus.CONFIRMED ? "LOCAL_OPERATOR" : null,
+                status == IndividualPaymentStatus.CONFIRMED ? CurrentActor.name() : null,
                 paymentShiftId
             );
             if (payment.method() == PaymentMethod.CASH) {
                 cashShifts.recordMovement(
                     cashShiftId, MovementType.SALE, Direction.IN, paymentAmount,
-                    "Cash receipt for order " + orderId, "LOCAL_OPERATOR", "PAYMENT", paymentId
+                    "Cash receipt for order " + orderId, CurrentActor.name(), "PAYMENT", paymentId
                 );
             }
         }
