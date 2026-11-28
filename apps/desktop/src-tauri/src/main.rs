@@ -48,7 +48,7 @@ fn start_local_api(app: &AppHandle, token: &str) -> Result<Child, String> {
         .arg(jar_path)
         .env("POS_BIND_ADDRESS", "127.0.0.1")
         .env("POS_LOCAL_API_PORT", "17890")
-        .env("POS_LOCAL_TOKEN", token)
+        .env("POS_SECURITY_LOCAL_TOKEN", token)
         .env("POS_DB_URL", std::env::var("POS_DB_URL").unwrap_or_else(|_| {
             "jdbc:postgresql://127.0.0.1:5432/restaurant_pos".to_string()
         }))
