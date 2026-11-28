@@ -88,6 +88,20 @@ public class CatalogService {
 
     @Transactional
     public ProductView createProduct(CreateProductRequest request) {
+        if (request.pricingMode() == CatalogDtos.PricingMode.FIXED) {
+            java.math.BigDecimal price = request.price();
+            if (price == null || price.signum() <= 0 || price.scale() > 2 || price.precision() > 14) {
+                throw PosException.badRequest(
+                    "INVALID_PRODUCT_PRICE",
+                    "Fixed product prices must be positive and have at most two decimal places."
+                );
+            }
+        } else if (request.price() != null) {
+            throw PosException.badRequest(
+                "UNEXPECTED_PRODUCT_PRICE",
+                "Ask-at-sale products must not store a fixed catalogue price."
+            );
+        }
         UUID categoryId = request.categoryId();
         String categoryName = jdbc.query(
             "SELECT name FROM categories WHERE id = ? AND active = TRUE",
