@@ -1,71 +1,50 @@
 # ADR-001: Local persistence and deployment topology
 
-- **Status:** Proposed — decision deferred pending executable spike
+- **Status:** PostgreSQL selected for the initial local-service implementation; Windows/macOS service packaging remains unvalidated.
 - **Date:** 2026-11-28
-- **Owners:** Product/engineering
 - **Scope:** Local-first Restaurant POS v1
 
 ## Context
 
-The product must support:
-1. One computer running the desktop application and local services.
-2. Multiple cashier/preparation terminals connecting to an in-store host over LAN.
-3. Sales and order capture without internet.
-4. Durable financial transactions, auditable cancellations/refunds, backup/restore, and safe upgrades.
-5. Windows and macOS packaging and support.
+The product must support one computer and multiple cashier/preparation terminals connecting to an in-store host over LAN. Sales and order capture must not require internet. Financial transactions, cancellations/refunds, audit, backup/restore, and safe upgrades must be durable.
 
-The current architecture names PostgreSQL as a candidate local database. That is not yet an evidence-backed decision. Selecting an embedded store solely for simple packaging risks multi-terminal write contention and recovery complexity. Selecting PostgreSQL without validating service installation, process lifecycle, permissions, upgrade, backup, and restore risks a fragile desktop installer.
+## Decision
 
-## Options to test
+Use PostgreSQL as the single local-service database engine for the initial implementation. Spring Boot is the only process permitted to access the database. The desktop UI and terminals call the business API; they never connect directly to PostgreSQL or share database files over a network.
 
-### A. PostgreSQL managed local service
-- Strengths: mature concurrent writes, transactions, indexing, operational tooling, and a clear host/server topology.
-- Risks: service lifecycle and installation, port/security configuration, upgrades, disk permissions, backup consistency, and uninstall/repair behavior.
+This is an implementation decision, not a claim that the database can already be installed, upgraded, or recovered automatically on Windows/macOS.
 
-### B. SQLite in WAL mode behind one local API
-- Strengths: simple single-file deployment, low operational overhead, transactional persistence, and easy local backup patterns when implemented correctly.
-- Risks: write serialization, busy handling, LAN workload limits, migration/backup coordination, and ensuring no client accesses the database file directly over a network share.
+## Rationale
 
-### C. Hybrid deployment
-- Single-computer mode uses embedded persistence; multi-terminal host uses PostgreSQL.
-- Strengths: can optimize simple and multi-terminal deployments separately.
-- Risks: two database dialects, migration parity, behavior divergence, more test combinations, and support burden.
+- The product has a stated multi-terminal host mode and sustained/burst workload requirements.
+- A single PostgreSQL engine avoids dual-dialect migrations and differences in monetary transaction behavior between single-device and host modes.
+- A single local API centralizes idempotency, business validation, authorization, audit, and concurrency handling.
+
+## Required packaging and operational spike
+
+Before a production installer is approved, prove on Windows and macOS:
+1. Service start/stop, restart after crash, health check, and graceful shutdown.
+2. Data-directory permissions and preservation across upgrades/uninstall.
+3. Database installation/bootstrap, role creation, migrations, patch updates, and rollback/recovery procedures.
+4. Consistent backup during active transactions and restore to a clean installation.
+5. 2–5 concurrent clients creating orders/payment/stock operations via the API without loss or duplicate posting.
+6. Network isolation: database listens only on loopback; LAN clients use authenticated encrypted API transport.
+7. CPU, RAM, disk growth, P50/P95 write latency, and lock behavior under expected and burst workloads.
+8. Real installer repair and data-retention tests.
 
 ## Security and integrity constraints
 
-- Desktop UI never connects directly to a database.
-- All writes pass through the local business API.
-- The database must not be exposed directly to LAN clients.
-- Order, payment, audit, and outbox records commit atomically where required.
-- Stable idempotency keys prevent retries from creating duplicate sales or payments.
-- Financial state must never use blind last-write-wins.
-- Backup must be consistent during active traffic; restore must validate integrity and preserve a pre-restore backup.
-- Database files, backups, logs, and credentials must have restrictive permissions.
-- Migrations must be tested against upgrade and rollback/recovery procedures.
-
-## Required spike and acceptance evidence
-
-Run the same workload against each viable option on Windows and macOS:
-
-1. Install, launch, restart, upgrade, repair, and uninstall behavior.
-2. Service start/stop/crash recovery and health reporting.
-3. 2–5 concurrent clients creating orders and stock movements through the API.
-4. Retry/replay tests proving no duplicate order/payment.
-5. Sustained and burst writes; capture P50/P95 latency, busy/lock errors, CPU, RAM, and disk growth.
-6. Backup during writes, restore to a clean installation, and reconcile record counts/totals.
-7. Schema migration from previous version and recovery from interrupted migration.
-8. LAN interruption and host restart behavior.
-9. Least-privilege file/service/network permissions.
-10. Test evidence and exact OS/runtime versions.
-
-## Decision rule
-
-Choose the simplest option that passes every integrity, recovery, concurrency, packaging, and support gate on both target operating systems. Performance objectives are measured, not assumed. If SQLite cannot meet the multi-terminal workload safely, do not force it into that mode. If PostgreSQL packaging is too operationally fragile, document the additional installation prerequisite or test a managed hybrid.
+- Database is never exposed directly to LAN clients.
+- Local API requires a high-entropy token for loopback access; this token must be delivered through OS-protected storage in the desktop app.
+- Multi-terminal access requires individual device credentials and TLS; the current shared local token is not approved for LAN.
+- Order, line snapshots, payment, audit, print queue, and outbox writes are transactional.
+- Stable idempotency keys prevent retries from creating duplicate sales.
+- Financial state never uses blind last-write-wins.
+- Backups must be encrypted where appropriate and validated by restore drills.
+- Database secrets and signing keys are never committed or shipped as plaintext.
 
 ## Consequences
 
-Until the spike passes:
-- No database technology is treated as final.
-- Business logic must depend on repository/service interfaces, not database-specific SQL in UI code.
-- No production data migration is introduced.
-- No claim of offline-ready or multi-terminal-ready behavior is allowed.
+- PostgreSQL is the implementation target for the local API.
+- Desktop sidecar lifecycle and signed database packaging remain release blockers.
+- No LAN mode, production rollout, or support claim is allowed until platform, recovery, concurrency, and security evidence passes.
