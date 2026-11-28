@@ -71,16 +71,36 @@ async fn api_status(state: State<'_, PosApiState>) -> ApiStatus {
         };
     }
 
-    match state.client
+    let health = state.client
         .get(format!("{API_BASE_URL}/actuator/health"))
         .timeout(Duration::from_secs(2))
         .send()
-        .await
-    {
-        Ok(response) if response.status().is_success() => ApiStatus {
-            available: true,
-            message: "Local API is ready".to_string(),
-        },
+        .await;
+
+    match health {
+        Ok(response) if response.status().is_success() => {
+            let authenticated = state.client
+                .get(format!("{API_BASE_URL}/api/v1/auth/setup-status"))
+                .header("X-POS-Local-Token", &state.token)
+                .timeout(Duration::from_secs(2))
+                .send()
+                .await;
+
+            match authenticated {
+                Ok(response) if response.status().is_success() => ApiStatus {
+                    available: true,
+                    message: "Local API and database are ready".to_string(),
+                },
+                Ok(response) => ApiStatus {
+                    available: false,
+                    message: format!("Local API authentication check returned HTTP {}", response.status()),
+                },
+                Err(_) => ApiStatus {
+                    available: false,
+                    message: "Local API authentication check failed".to_string(),
+                },
+            }
+        }
         Ok(response) => ApiStatus {
             available: false,
             message: format!("Local API health check returned HTTP {}", response.status()),
