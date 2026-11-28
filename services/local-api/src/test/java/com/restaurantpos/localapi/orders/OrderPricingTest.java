@@ -10,14 +10,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class OrderPricingTest {
     @Test
-    void roundsEachLineToTwoMinorDigits() {
-        assertEquals(new BigDecimal("2.51"), OrderPricing.lineTotal(
-            new BigDecimal("1.255"), new BigDecimal("2")
+    void multipliesMoneyAndQuantityWithoutFloatingPointArithmetic() {
+        assertEquals(new BigDecimal("2.50"), OrderPricing.lineTotal(
+            new BigDecimal("1.25"), new BigDecimal("2")
         ));
     }
 
     @Test
-    void roundsFractionalQuantitiesDeterministically() {
+    void roundsFractionalQuantitiesToCurrencyMinorUnit() {
         assertEquals(new BigDecimal("3.34"), OrderPricing.lineTotal(
             new BigDecimal("10.00"), new BigDecimal("0.334")
         ));
@@ -35,6 +35,11 @@ class OrderPricingTest {
     }
 
     @Test
+    void rejectsUnitPriceWithMoreThanTwoDecimals() {
+        assertThrows(PosException.class, () -> OrderPricing.normalizeUnitPrice(new BigDecimal("1.255")));
+    }
+
+    @Test
     void rejectsDiscountAboveSubtotal() {
         assertThrows(PosException.class, () -> OrderPricing.orderTotal(
             new BigDecimal("10.00"), new BigDecimal("10.01"), BigDecimal.ZERO
@@ -42,7 +47,7 @@ class OrderPricingTest {
     }
 
     @Test
-    void calculatesTotalWithoutFloatingPointArithmetic() {
+    void calculatesTotalDeterministically() {
         assertEquals(new BigDecimal("16.75"), OrderPricing.orderTotal(
             new BigDecimal("20.00"), new BigDecimal("5.25"), new BigDecimal("2.00")
         ));
