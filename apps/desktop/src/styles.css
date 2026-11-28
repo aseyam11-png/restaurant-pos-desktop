@@ -307,3 +307,17 @@ tbody tr:hover { background: #1d2326; }
 .delivery-order-card strong { color: #e5e7e1; font-size: 12px; }
 .delivery-order-card b { color: #dfaa7d; font-size: 10px; }
 .delivery-order-card > span { color: #aab2b2; font-size: 10px; }
+
+
+.table-assignment-controls { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: end; gap: 10px; padding: 13px; border: 1px solid #363f43; border-radius: 6px; background: #1b2225; }
+.table-assignment-controls label { display: grid; gap: 6px; color: #a8b1b1; font-size: 10px; }
+.table-assignment-controls select, .table-transfer select { height: 35px; min-width: 0; padding: 0 9px; border: 1px solid #3a4448; border-radius: 4px; background: #121719; color: #ebebe6; font-size: 10px; }
+.table-assignment-controls .primary-action { width: 110px; min-height: 35px; margin: 0; }
+.table-transfer { display: flex; width: 100%; gap: 6px; }
+.table-transfer select { flex: 1; width: 0; }
+.table-transfer button, .table-status-action { border: 1px solid #745239; border-radius: 4px; background: #30251f; color: #e5b18a; font-size: 9px; padding: 7px 9px; }
+.table-status-action { align-self: start; margin-top: 4px; }
+@media (max-width: 700px) {
+  .table-assignment-controls { grid-template-columns: 1fr; }
+  .table-assignment-controls .primary-action { width: 100%; }
+}
