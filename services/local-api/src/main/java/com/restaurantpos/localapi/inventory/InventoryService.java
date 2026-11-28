@@ -1,4 +1,6 @@
 package com.restaurantpos.localapi.inventory;
+
+import com.restaurantpos.localapi.auth.CurrentActor;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -44,7 +46,7 @@ public class InventoryService {
   jdbc.update("""
    INSERT INTO inventory_movements(id,product_id,movement_type,quantity_delta,reference_type,reference_id,reason,created_by)
    VALUES(?,?,?,?,'MANUAL',?,?,?)
-   """,id,p.id(),request.movementType().name(),delta,id,request.reason().trim(),request.createdBy().trim());
+   """,id,p.id(),request.movementType().name(),delta,id,request.reason().trim(),CurrentActor.name());
   return getMovement(id);
  }
  @Transactional
