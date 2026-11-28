@@ -52,6 +52,11 @@ public class OrderController {
         return service.changePreparationStatus(id, nextStatus);
     }
 
+    @PostMapping("/orders/{id}/refund")
+    public OrderView refundOrder(@PathVariable UUID id, @Valid @RequestBody RefundOrderRequest request) {
+        return service.refundOrder(id, request.reason(), request.refundedBy());
+    }
+
     @PostMapping("/orders/{orderId}/payments/{paymentId}/confirm")
     public OrderView confirmPayment(
         @PathVariable UUID orderId,

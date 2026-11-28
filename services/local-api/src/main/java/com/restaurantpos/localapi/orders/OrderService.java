@@ -283,8 +283,8 @@ public class OrderService {
     @Transactional
     public OrderView cancelOrder(UUID orderId, String reason) {
         OrderHeaderForUpdate current = jdbc.query(
-            "SELECT preparation_status FROM orders WHERE id = ? FOR UPDATE",
-            rs -> rs.next() ? new OrderHeaderForUpdate(rs.getString(1)) : null,
+            "SELECT preparation_status, payment_status FROM orders WHERE id = ? FOR UPDATE",
+            rs -> rs.next() ? new OrderHeaderForUpdate(rs.getString("preparation_status"), rs.getString("payment_status")) : null,
             orderId
         );
         if (current == null) throw PosException.notFound("Order was not found.");
@@ -309,16 +309,78 @@ public class OrderService {
             "UPDATE payments SET status = 'VOIDED' WHERE order_id = ? AND status = 'PENDING_CONFIRMATION'",
             orderId
         );
+        String nextPaymentStatus = "REFUNDED".equals(current.paymentStatus()) ? "REFUNDED" : "UNPAID";
         jdbc.update("""
             UPDATE orders
-            SET preparation_status = 'CANCELLED', payment_status = 'UNPAID',
+            SET preparation_status = 'CANCELLED', payment_status = ?,
                 cancelled_at = now(), cancellation_reason = ?, updated_at = now()
             WHERE id = ?
-            """, reason.trim(), orderId);
+            """, nextPaymentStatus, reason.trim(), orderId);
         jdbc.update("""
             INSERT INTO audit_events(id, aggregate_type, aggregate_id, event_type, actor, reason, payload)
             VALUES (?, 'ORDER', ?, 'ORDER_CANCELLED', 'LOCAL_OPERATOR', ?, '{}'::jsonb)
             """, UUID.randomUUID(), orderId, reason.trim());
+        return getOrder(orderId);
+    }
+
+    @Transactional
+    public OrderView refundOrder(UUID orderId, String reason, String refundedBy) {
+        RefundOrderHeader order = jdbc.query(
+            "SELECT payment_status FROM orders WHERE id = ? FOR UPDATE",
+            rs -> rs.next() ? new RefundOrderHeader(rs.getString(1)) : null,
+            orderId
+        );
+        if (order == null) throw PosException.notFound("Order was not found.");
+
+        List<RefundablePayment> refundable = jdbc.query(
+            "SELECT id, amount, currency FROM payments WHERE order_id = ? AND status = 'CONFIRMED' FOR UPDATE",
+            (rs, row) -> new RefundablePayment(
+                rs.getObject("id", UUID.class),
+                rs.getBigDecimal("amount"),
+                rs.getString("currency").trim()
+            ),
+            orderId
+        );
+        if (refundable.isEmpty()) {
+            Long previousRefunds = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM payment_refunds WHERE order_id = ?",
+                Long.class,
+                orderId
+            );
+            if (previousRefunds != null && previousRefunds > 0) return getOrder(orderId);
+            throw PosException.conflict("NO_CONFIRMED_PAYMENT", "There are no confirmed payments to refund.");
+        }
+
+        for (RefundablePayment payment : refundable) {
+            jdbc.update("""
+                INSERT INTO payment_refunds(id, order_id, payment_id, amount, currency, reason, refunded_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                UUID.randomUUID(), orderId, payment.id(), payment.amount(), payment.currency(),
+                reason.trim(), refundedBy.trim()
+            );
+            jdbc.update(
+                "UPDATE payments SET status = 'REFUNDED' WHERE id = ? AND order_id = ? AND status = 'CONFIRMED'",
+                payment.id(), orderId
+            );
+        }
+        jdbc.update(
+            "UPDATE payments SET status = 'VOIDED' WHERE order_id = ? AND status = 'PENDING_CONFIRMATION'",
+            orderId
+        );
+        jdbc.update(
+            "UPDATE orders SET payment_status = 'REFUNDED', updated_at = now() WHERE id = ?",
+            orderId
+        );
+        jdbc.update("""
+            INSERT INTO audit_events(id, aggregate_type, aggregate_id, event_type, actor, reason, payload)
+            VALUES (?, 'ORDER', ?, 'ORDER_REFUNDED', ?, ?, '{}'::jsonb)
+            """, UUID.randomUUID(), orderId, refundedBy.trim(), reason.trim());
+        String payload = "{\"eventVersion\":1,\"orderId\":\"" + orderId + "\"}";
+        jdbc.update("""
+            INSERT INTO outbox_events(id, aggregate_type, aggregate_id, event_type, payload)
+            VALUES (?, 'ORDER', ?, 'ORDER_REFUNDED', CAST(? AS jsonb))
+            """, UUID.randomUUID(), orderId, payload);
         return getOrder(orderId);
     }
 
@@ -508,7 +570,9 @@ public class OrderService {
         BigDecimal subtotal, BigDecimal discountAmount, BigDecimal taxAmount,
         BigDecimal total, String currency, OffsetDateTime createdAt
     ) {}
-    private record OrderHeaderForUpdate(String preparationStatus) {}
+    private record OrderHeaderForUpdate(String preparationStatus, String paymentStatus) {}
+    private record RefundOrderHeader(String paymentStatus) {}
+    private record RefundablePayment(UUID id, BigDecimal amount, String currency) {}
     private record PaymentStatusRow(BigDecimal total, String status, String preparationStatus) {}
     private record PaymentTotals(BigDecimal confirmed, BigDecimal pending) {}
 }

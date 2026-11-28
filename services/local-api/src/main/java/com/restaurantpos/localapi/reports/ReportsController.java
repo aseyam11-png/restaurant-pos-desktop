@@ -54,7 +54,8 @@ public class ReportsController {
             """
             SELECT
               COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'CONFIRMED'), 0) AS collected,
-              COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'PENDING_CONFIRMATION'), 0) AS pending
+              COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'PENDING_CONFIRMATION'), 0) AS pending,
+              COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'REFUNDED'), 0) AS refunded
             FROM payments p
             JOIN orders o ON o.id = p.order_id
             WHERE o.created_at >= ? AND o.created_at < ?
@@ -62,8 +63,9 @@ public class ReportsController {
             """,
             rs -> rs.next() ? new PaymentTotals(
                 rs.getBigDecimal("collected"),
-                rs.getBigDecimal("pending")
-            ) : new PaymentTotals(BigDecimal.ZERO, BigDecimal.ZERO),
+                rs.getBigDecimal("pending"),
+                rs.getBigDecimal("refunded")
+            ) : new PaymentTotals(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
             startAt,
             endAt
         );
@@ -76,6 +78,8 @@ public class ReportsController {
             totals.orderValue(),
             payments.collected(),
             payments.pending(),
+            payments.refunded(),
+            totals.orderValue().subtract(payments.refunded()),
             "UTC"
         );
     }
@@ -125,6 +129,8 @@ public class ReportsController {
         BigDecimal orderValue,
         BigDecimal confirmedCollections,
         BigDecimal pendingConfirmations,
+        BigDecimal refundedAmount,
+        BigDecimal netSalesAfterRefunds,
         String reportingTimeZone
     ) {}
 
@@ -137,5 +143,5 @@ public class ReportsController {
     ) {}
 
     private record SummaryRow(long orderCount, long cancelledCount, BigDecimal orderValue) {}
-    private record PaymentTotals(BigDecimal collected, BigDecimal pending) {}
+    private record PaymentTotals(BigDecimal collected, BigDecimal pending, BigDecimal refunded) {}
 }

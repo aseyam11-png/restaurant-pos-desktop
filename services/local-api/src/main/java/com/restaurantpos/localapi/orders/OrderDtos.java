@@ -81,6 +81,11 @@ public final class OrderDtos {
         @NotBlank @Size(max = 80) String confirmedBy
     ) {}
 
+    public record RefundOrderRequest(
+        @NotBlank @Size(max = 240) String reason,
+        @NotBlank @Size(max = 80) String refundedBy
+    ) {}
+
     public record OrderLineView(
         UUID id,
         UUID productId,
