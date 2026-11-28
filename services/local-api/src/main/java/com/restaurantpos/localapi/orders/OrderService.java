@@ -42,6 +42,17 @@ public class OrderService {
 
     @Transactional
     public OrderView createOrder(String idempotencyKey, CreateOrderRequest request) {
+        String configuredCurrency = jdbc.query(
+            "SELECT setting_value FROM store_settings WHERE setting_key = 'currency'",
+            rs -> rs.next() ? rs.getString(1) : "ILS"
+        );
+        if (!configuredCurrency.equalsIgnoreCase(request.currency())) {
+            throw PosException.badRequest(
+                "STORE_CURRENCY_MISMATCH",
+                "The transaction currency must match the configured store currency."
+            );
+        }
+
         if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 128) {
             throw PosException.badRequest("IDEMPOTENCY_KEY_REQUIRED", "A non-empty Idempotency-Key header of at most 128 characters is required.");
         }
