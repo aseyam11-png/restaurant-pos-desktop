@@ -44,6 +44,14 @@ public class OrderController {
         return service.cancelOrder(id, request.reason());
     }
 
+    @PatchMapping("/orders/{id}/preparation")
+    public OrderView changePreparationStatus(
+        @PathVariable UUID id,
+        @RequestBody PreparationStatus nextStatus
+    ) {
+        return service.changePreparationStatus(id, nextStatus);
+    }
+
     @PostMapping("/orders/{orderId}/payments/{paymentId}/confirm")
     public OrderView confirmPayment(
         @PathVariable UUID orderId,
