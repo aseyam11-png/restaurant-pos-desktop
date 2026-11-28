@@ -31,6 +31,19 @@ export function AuthGate({ enabled, onAuthenticated }: Props) {
     return () => { current = false; };
   }, [enabled]);
 
+  const retrySetupCheck = async () => {
+    if (!enabled) return;
+    setLoading(true);
+    setError("");
+    try {
+      setSetup(await authApi.setupStatus());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "تعذر التحقق من إعداد الحساب.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const acceptSession = (session: AuthSession) => {
     setSessionToken(session.accessToken);
     setPassword("");
@@ -89,6 +102,7 @@ export function AuthGate({ enabled, onAuthenticated }: Props) {
         </p>
         {!enabled && <div className="auth-error">الخدمة المحلية غير متاحة. لن يتم قبول بيانات الدخول قبل اتصال قاعدة البيانات.</div>}
         {error && <div className="auth-error" role="alert">{error}</div>}
+        {error && enabled && !setup && <button type="button" className="secondary-action" onClick={() => void retrySetupCheck()} disabled={loading || busy}>إعادة التحقق من الخدمة</button>}
         <form onSubmit={(event) => void submit(event)}>
           <label>اسم المستخدم
             <input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required minLength={3} maxLength={40} disabled={!enabled || loading || busy} />
