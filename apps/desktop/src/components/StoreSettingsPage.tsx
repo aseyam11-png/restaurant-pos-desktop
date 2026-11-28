@@ -93,7 +93,7 @@ export function StoreSettingsPage({ enabled, settings, onSaved }: Props) {
           <input value={receiptFooter} onChange={(event) => setReceiptFooter(event.target.value)} maxLength={300} disabled={!enabled || busy} />
         </label>
       </div>
-      <p className="form-hint">يتم تخزين نسبة الضريبة ضمن إعدادات المتجر. لن تُحتسب على الطلبات حتى اكتمال اعتماد سياسة الضرائب والاختبارات المالية في محرك الطلبات.</p>
+      <p className="form-hint">تُحسب الضريبة على قيمة الطلب بعد الخصم داخل الخادم وفق هذه النسبة، مع التقريب إلى منزلتين عشريتين. لا تعتمد الواجهة قيمة الضريبة المرسلة من العميل.</p>
       <button className="primary-action settings-submit" type="submit" disabled={!enabled || busy}>
         {busy ? "جارٍ الحفظ…" : "حفظ الإعدادات"}
       </button>
