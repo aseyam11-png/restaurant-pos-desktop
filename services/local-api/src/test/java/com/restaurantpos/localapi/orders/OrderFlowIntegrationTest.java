@@ -97,4 +97,56 @@ class OrderFlowIntegrationTest {
         );
         assertEquals(3L, events);
     }
+
+    @Test
+    void refundIsAuditedIdempotentAndCanBeFollowedByCancellation() {
+        var category = catalog.createCategory(new CreateCategoryRequest("Refund-" + UUID.randomUUID(), 0));
+        var product = catalog.createProduct(new CreateProductRequest(
+            category.id(), "Refund product", "piece", PricingMode.FIXED,
+            new BigDecimal("12.50"), false
+        ));
+        OrderView order = orders.createOrder("refund-" + UUID.randomUUID(), new CreateOrderRequest(
+            "Refund customer", OrderType.TAKEAWAY,
+            List.of(new OrderLineRequest(product.id(), new BigDecimal("2"), null)),
+            BigDecimal.ZERO, BigDecimal.ZERO, "ILS",
+            List.of(new PaymentRequest(PaymentMethod.CASH, new BigDecimal("25.00"), null))
+        ));
+        assertEquals(PaymentStatus.PAID, order.paymentStatus());
+
+        OrderView refunded = orders.refundOrder(order.id(), "Customer returned order", "Owner");
+        assertEquals(PaymentStatus.REFUNDED, refunded.paymentStatus());
+        assertEquals(IndividualPaymentStatus.REFUNDED, refunded.payments().get(0).status());
+
+        OrderView repeatedRefund = orders.refundOrder(order.id(), "Duplicate request", "Owner");
+        assertEquals(PaymentStatus.REFUNDED, repeatedRefund.paymentStatus());
+        Long refundCount = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM payment_refunds WHERE order_id = ?", Long.class, order.id()
+        );
+        assertEquals(1L, refundCount);
+
+        OrderView cancelled = orders.cancelOrder(order.id(), "Order closed after refund");
+        assertEquals(PreparationStatus.CANCELLED, cancelled.preparationStatus());
+        assertEquals(PaymentStatus.REFUNDED, cancelled.paymentStatus());
+        assertEquals(IndividualPaymentStatus.REFUNDED, cancelled.payments().get(0).status());
+    }
+
+    @Test
+    void cancellingPendingWalletPaymentVoidsPaymentWithoutLeakingSenderPhone() {
+        var category = catalog.createCategory(new CreateCategoryRequest("Void-" + UUID.randomUUID(), 0));
+        var product = catalog.createProduct(new CreateProductRequest(
+            category.id(), "Void product", "piece", PricingMode.FIXED,
+            new BigDecimal("4.00"), false
+        ));
+        OrderView order = orders.createOrder("void-" + UUID.randomUUID(), new CreateOrderRequest(
+            "Void customer", OrderType.DELIVERY,
+            List.of(new OrderLineRequest(product.id(), new BigDecimal("1"), null)),
+            BigDecimal.ZERO, BigDecimal.ZERO, "ILS",
+            List.of(new PaymentRequest(PaymentMethod.WALLET, new BigDecimal("4.00"), "0597654321"))
+        ));
+
+        OrderView cancelled = orders.cancelOrder(order.id(), "Wallet transfer not received");
+        assertEquals(PreparationStatus.CANCELLED, cancelled.preparationStatus());
+        assertEquals(IndividualPaymentStatus.VOIDED, cancelled.payments().get(0).status());
+        assertFalse(cancelled.toString().contains("0597654321"));
+    }
 }
