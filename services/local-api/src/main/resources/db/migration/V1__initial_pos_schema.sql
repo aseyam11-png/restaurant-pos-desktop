@@ -82,7 +82,7 @@ CREATE TABLE payments (
     id UUID PRIMARY KEY,
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,
     method VARCHAR(20) NOT NULL CHECK (method IN ('CASH', 'WALLET', 'BANK_CARD')),
-    status VARCHAR(32) NOT NULL CHECK (status IN ('PENDING_CONFIRMATION', 'CONFIRMED', 'REFUNDED')),
+    status VARCHAR(32) NOT NULL CONSTRAINT ck_payments_status CHECK (status IN ('PENDING_CONFIRMATION', 'CONFIRMED', 'REFUNDED')),
     amount NUMERIC(14,2) NOT NULL CHECK (amount > 0),
     currency CHAR(3) NOT NULL,
     sender_phone VARCHAR(24),
