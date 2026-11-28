@@ -139,9 +139,13 @@ async fn pos_api_request(
     })?;
     let status = response.status();
     let text = response.text().await.map_err(|error| error.to_string())?;
-    let value = serde_json::from_str::<Value>(&text).unwrap_or_else(|_| {
-        serde_json::json!({ "message": text })
-    });
+    let value = if status == reqwest::StatusCode::NO_CONTENT || text.trim().is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_str::<Value>(&text).unwrap_or_else(|_| {
+            serde_json::json!({ "message": text })
+        })
+    };
 
     if !status.is_success() {
         let detail = value.get("detail")
