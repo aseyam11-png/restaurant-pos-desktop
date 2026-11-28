@@ -3,7 +3,6 @@ import {
   posApi,
   type CashMovement,
   type CashShift,
-  type CashShift,
   type ExpenseView,
   type PaymentMethod,
   type Product,
