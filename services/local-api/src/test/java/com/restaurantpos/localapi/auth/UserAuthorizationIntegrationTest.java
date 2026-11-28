@@ -45,7 +45,9 @@ class UserAuthorizationIntegrationTest {
         auth.createStaff(new CreateStaffRequest(
             cashierName, "Front Cashier", "A-Temporary-Password-2026", StaffRole.CASHIER
         ));
-        String token = auth.login(new LoginRequest(cashierName, "A-Temporary-Password-2026")).accessToken();
+        var firstLogin = auth.login(new LoginRequest(cashierName, "A-Temporary-Password-2026"));
+        String token = auth.changePassword(firstLogin.accessToken(),
+            new ChangePasswordRequest("A-Temporary-Password-2026", "A-New-Strong-Password-2026")).accessToken();
 
         mvc.perform(get("/api/v1/catalog/products")
             .header("X-POS-Local-Token", "integration-test-token")
@@ -77,7 +79,9 @@ class UserAuthorizationIntegrationTest {
         auth.createStaff(new CreateStaffRequest(
             cashierName, "Authenticated Cashier", "A-Temporary-Password-2026", StaffRole.CASHIER
         ));
-        String token = auth.login(new LoginRequest(cashierName, "A-Temporary-Password-2026")).accessToken();
+        var firstLogin = auth.login(new LoginRequest(cashierName, "A-Temporary-Password-2026"));
+        String token = auth.changePassword(firstLogin.accessToken(),
+            new ChangePasswordRequest("A-Temporary-Password-2026", "A-New-Strong-Password-2026")).accessToken();
 
         mvc.perform(post("/api/v1/cash-shifts/open")
             .header("X-POS-Local-Token", "integration-test-token")
