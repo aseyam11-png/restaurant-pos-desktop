@@ -162,6 +162,7 @@ fn main() {
     let token_for_setup = token.clone();
 
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
         .setup(move |app| {
             let child = start_local_api(app.handle(), &token_for_setup);
             let (child, startup_error) = match child {
