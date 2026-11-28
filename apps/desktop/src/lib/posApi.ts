@@ -148,6 +148,16 @@ export interface DeliveryAssignment {
   customerPhone?: string | null;
 }
 
+export interface UnassignedDineInOrder {
+  id: string;
+  orderNumber: number;
+  customerName: string;
+  total: number;
+  currency: string;
+  preparationStatus: PreparationStatus;
+  createdAt: string;
+}
+
 export interface SalesSummary {
   from: string;
   to: string;
@@ -325,6 +335,18 @@ export const posApi = {
     }),
   inventory: (lowStockOnly = false) =>
     apiRequest<InventoryBalance[]>("GET", `/api/v1/inventory/balances?lowStockOnly=${lowStockOnly}`),
+  diningZones: () => apiRequest<Array<{ id: string; name: string; sortOrder: number; active: boolean }>>("GET", "/api/v1/dining/zones"),
+  createDiningZone: (name: string) => apiRequest<unknown>("POST", "/api/v1/dining/zones", { name, sortOrder: 0 }),
+  createDiningTable: (body: { zoneId: string; tableNumber: number; label: string; seats: number }) =>
+    apiRequest<DiningTable>("POST", "/api/v1/dining/tables", body),
+  updateDiningTableStatus: (id: string, status: DiningTable["status"]) =>
+    apiRequest<DiningTable>("PATCH", `/api/v1/dining/tables/${encodeURIComponent(id)}/status`, { status }),
+  assignOrderToTable: (tableId: string, orderId: string) =>
+    apiRequest<DiningTable>("POST", `/api/v1/dining/tables/${encodeURIComponent(tableId)}/orders`, { orderId }),
+  transferTableOrder: (tableId: string, targetTableId: string) =>
+    apiRequest<DiningTable>("POST", `/api/v1/dining/tables/${encodeURIComponent(tableId)}/transfer`, { targetTableId }),
+  unassignedDineInOrders: () =>
+    apiRequest<UnassignedDineInOrder[]>("GET", "/api/v1/dining/unassigned-orders"),
   diningTables: () => apiRequest<DiningTable[]>("GET", "/api/v1/dining/tables"),
   salesSummary: (from?: string, to?: string) => {
     const params = new URLSearchParams();
