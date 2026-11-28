@@ -751,7 +751,7 @@ public class OrderService {
             );
         }
         BigDecimal rate = jdbc.query(
-            "SELECT setting_value FROM store_settings WHERE setting_key = 'tax_rate_percent'",
+            "SELECT setting_value FROM store_settings WHERE setting_key = 'tax_rate_percent' FOR SHARE",
             rs -> rs.next() ? new BigDecimal(rs.getString(1)) : BigDecimal.ZERO
         );
         BigDecimal taxableBase = subtotal.subtract(discountAmount).max(BigDecimal.ZERO);
