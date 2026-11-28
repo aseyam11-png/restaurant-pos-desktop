@@ -25,6 +25,13 @@
     }
   },
   "bundle": {
-    "active": false
+    "active": true,
+    "resources": [
+      "../resources/restaurant-pos-local-api.jar"
+    ],
+    "targets": [
+      "nsis",
+      "dmg"
+    ]
   }
 }
