@@ -158,6 +158,20 @@ export interface UnassignedDineInOrder {
   createdAt: string;
 }
 
+export interface StoreSettings {
+  currency: string;
+  taxRatePercent: number;
+  businessName: string;
+  receiptFooter: string;
+}
+
+export interface UpdateStoreSettings {
+  currency: string;
+  taxRatePercent: number;
+  businessName: string;
+  receiptFooter: string;
+}
+
 export interface SalesSummary {
   from: string;
   to: string;
@@ -317,6 +331,10 @@ export const authApi = {
 };
 
 export const posApi = {
+  storeSettings: () => apiRequest<StoreSettings>("GET", "/api/v1/settings/store"),
+  updateStoreSettings: (body: UpdateStoreSettings) =>
+    apiRequest<StoreSettings>("PUT", "/api/v1/settings/store", body),
+
   categories: () => apiRequest<Category[]>("GET", "/api/v1/catalog/categories"),
   products: (query = "") => apiRequest<Product[]>(
     "GET",
