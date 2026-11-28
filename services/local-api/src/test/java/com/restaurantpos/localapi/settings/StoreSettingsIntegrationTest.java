@@ -53,7 +53,7 @@ class StoreSettingsIntegrationTest {
             BigDecimal.ZERO, BigDecimal.ZERO, "ILS", List.of()
         ));
 
-        PosException error = assertThrows(PosException.class, () ->
+        assertThrows(PosException.class, () ->
             settings.update(new UpdateStoreSettingsRequest(
                 "SAR", new BigDecimal("0.00"), "Restaurant", "Thank you"
             ))
@@ -63,7 +63,7 @@ class StoreSettingsIntegrationTest {
 
     @Test
     void taxRateCannotExceedOneHundredPercent() {
-        assertThrows(Exception.class, () -> settings.update(new UpdateStoreSettingsRequest(
+        assertThrows(PosException.class, () -> settings.update(new UpdateStoreSettingsRequest(
             "ILS", new BigDecimal("100.01"), "Restaurant", "Thank you"
         )));
     }
