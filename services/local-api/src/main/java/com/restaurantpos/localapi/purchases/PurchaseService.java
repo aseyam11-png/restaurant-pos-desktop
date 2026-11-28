@@ -57,12 +57,12 @@ public class PurchaseService {
   if(paid.signum()>0&&request.paymentMethod()==null)throw PosException.badRequest("PURCHASE_PAYMENT_METHOD_REQUIRED","Select a payment method when recording a paid amount.");
   if(paid.signum()==0&&request.paymentMethod()!=null)throw PosException.badRequest("UNUSED_PAYMENT_METHOD","A payment method must be omitted when no amount is paid.");
   UUID shiftId=paid.signum()>0&&request.paymentMethod()==PaymentMethod.CASH?cash.requireOpenShiftForUpdate():null;
-  UUID purchaseId=UUID.randomUUID();BigDecimal due=total.subtract(paid).setScale(2);
+  UUID purchaseId=UUID.randomUUID();BigDecimal due=total.subtract(paid).setScale(2);String paymentStatus=due.signum()==0?"PAID":paid.signum()>0?"PARTIALLY_PAID":"UNPAID";
   OffsetDateTime purchasedAt=request.purchasedAt()==null?OffsetDateTime.now():request.purchasedAt();
   jdbc.update("""
-   INSERT INTO purchases(id,supplier_id,status,subtotal,discount_amount,total,paid_amount,due_amount,currency,payment_method,cash_shift_id,purchased_at,created_by)
-   VALUES(?,?,'POSTED',?,?,?,?,?,?,?,?,?,?)
-   """,purchaseId,request.supplierId(),subtotal,discount,total,paid,due,currency,request.paymentMethod()==null?null:request.paymentMethod().name(),shiftId,purchasedAt,request.createdBy().trim());
+   INSERT INTO purchases(id,supplier_id,status,subtotal,discount_amount,total,paid_amount,due_amount,currency,payment_method,payment_status,cash_shift_id,purchased_at,created_by)
+   VALUES(?,?,'POSTED',?,?,?,?,?,?,?,?,?,?,?)
+   """,purchaseId,request.supplierId(),subtotal,discount,total,paid,due,currency,request.paymentMethod()==null?null:request.paymentMethod().name(),paymentStatus,shiftId,purchasedAt,request.createdBy().trim());
   for(PreparedLine line:lines){
    jdbc.update("""
     INSERT INTO purchase_lines(id,purchase_id,product_id,product_no_snapshot,product_name_snapshot,unit_snapshot,quantity,unit_cost,line_total)
@@ -74,6 +74,12 @@ public class PurchaseService {
     INSERT INTO inventory_movements(id,product_id,movement_type,quantity_delta,reference_type,reference_id,reason,created_by)
     VALUES(?,?,'PURCHASE',?,'PURCHASE',?,'Supplier purchase posted',?)
     """,UUID.randomUUID(),line.product().id(),line.quantity(),purchaseId,request.createdBy().trim());
+  }
+  if(paid.signum()>0){
+   jdbc.update("""
+    INSERT INTO supplier_payments(id,purchase_id,method,amount,currency,cash_shift_id,paid_at,recorded_by)
+    VALUES(?,?,?,?,?,?,?,?)
+    """,UUID.randomUUID(),purchaseId,request.paymentMethod().name(),paid,currency,shiftId,purchasedAt,request.createdBy().trim());
   }
   if(paid.signum()>0&&request.paymentMethod()==PaymentMethod.CASH){
    cash.recordMovement(shiftId,MovementType.PURCHASE,Direction.OUT,paid,"Supplier purchase #"+purchaseNumber(purchaseId),request.createdBy().trim(),"PURCHASE",purchaseId);
@@ -89,12 +95,12 @@ public class PurchaseService {
  @Transactional(readOnly=true)
  public PurchaseView get(UUID id){
   Header h=jdbc.query("""
-   SELECT id,purchase_no,supplier_id,status,subtotal,discount_amount,total,paid_amount,due_amount,currency,payment_method,purchased_at,created_by
+   SELECT id,purchase_no,supplier_id,status,payment_status,subtotal,discount_amount,total,paid_amount,due_amount,currency,payment_method,purchased_at,created_by
    FROM purchases WHERE id=?
-   """,rs->rs.next()?new Header(rs.getObject("id",UUID.class),rs.getLong("purchase_no"),rs.getObject("supplier_id",UUID.class),rs.getString("status"),rs.getBigDecimal("subtotal"),rs.getBigDecimal("discount_amount"),rs.getBigDecimal("total"),rs.getBigDecimal("paid_amount"),rs.getBigDecimal("due_amount"),rs.getString("currency").trim(),rs.getString("payment_method"),rs.getObject("purchased_at",OffsetDateTime.class),rs.getString("created_by")):null,id);
+   """,rs->rs.next()?new Header(rs.getObject("id",UUID.class),rs.getLong("purchase_no"),rs.getObject("supplier_id",UUID.class),rs.getString("status"),rs.getString("payment_status"),rs.getBigDecimal("subtotal"),rs.getBigDecimal("discount_amount"),rs.getBigDecimal("total"),rs.getBigDecimal("paid_amount"),rs.getBigDecimal("due_amount"),rs.getString("currency").trim(),rs.getString("payment_method"),rs.getObject("purchased_at",OffsetDateTime.class),rs.getString("created_by")):null,id);
   if(h==null)throw PosException.notFound("Purchase was not found.");
   List<PurchaseLineView> lines=jdbc.query("SELECT id,product_id,product_no_snapshot,product_name_snapshot,unit_snapshot,quantity,unit_cost,line_total FROM purchase_lines WHERE purchase_id=? ORDER BY id",(rs,row)->new PurchaseLineView(rs.getObject("id",UUID.class),rs.getObject("product_id",UUID.class),rs.getLong("product_no_snapshot"),rs.getString("product_name_snapshot"),rs.getString("unit_snapshot"),rs.getBigDecimal("quantity"),rs.getBigDecimal("unit_cost"),rs.getBigDecimal("line_total")),id);
-  return new PurchaseView(h.id(),h.number(),h.supplierId(),h.status(),h.subtotal(),h.discount(),h.total(),h.paid(),h.due(),h.currency(),h.method()==null?null:PaymentMethod.valueOf(h.method()),h.purchasedAt(),h.createdBy(),lines);
+  return new PurchaseView(h.id(),h.number(),h.supplierId(),h.status(),h.paymentStatus(),h.subtotal(),h.discount(),h.total(),h.paid(),h.due(),h.currency(),h.method()==null?null:PaymentMethod.valueOf(h.method()),h.purchasedAt(),h.createdBy(),lines);
  }
  @Transactional(readOnly=true)
  public List<PurchaseView> list(int requestedLimit){int limit=Math.max(1,Math.min(requestedLimit,200));List<UUID> ids=jdbc.query("SELECT id FROM purchases ORDER BY purchased_at DESC LIMIT ?",(rs,row)->rs.getObject(1,UUID.class),limit);return ids.stream().map(this::get).toList();}
@@ -106,5 +112,5 @@ public class PurchaseService {
  private record Existing(String hash,UUID purchaseId){}
  private record ProductRow(UUID id,long number,String name,String unit,boolean stockTracked){}
  private record PreparedLine(ProductRow product,BigDecimal quantity,BigDecimal cost,BigDecimal total){}
- private record Header(UUID id,long number,UUID supplierId,String status,BigDecimal subtotal,BigDecimal discount,BigDecimal total,BigDecimal paid,BigDecimal due,String currency,String method,OffsetDateTime purchasedAt,String createdBy){}
+ private record Header(UUID id,long number,UUID supplierId,String status,String paymentStatus,BigDecimal subtotal,BigDecimal discount,BigDecimal total,BigDecimal paid,BigDecimal due,String currency,String method,OffsetDateTime purchasedAt,String createdBy){}
 }
